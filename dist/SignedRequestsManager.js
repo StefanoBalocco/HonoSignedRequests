@@ -2,11 +2,20 @@ import { fromBase64Url } from './Common';
 import { SessionsStorageLocal } from './SessionsStorageLocal';
 export class SignedRequestsManager {
     _storage;
-    constructor(storage) {
+    _validitySignature;
+    _validityToken;
+    _tokenLength;
+    constructor(storage, options) {
+        this._validitySignature = options?.validitySignature ?? 5000;
+        this._validityToken = options?.validityToken ?? 60 * 60000;
+        this._tokenLength = options?.tokenLength ?? 32;
         if (!storage) {
             storage = new SessionsStorageLocal();
         }
         this._storage = storage;
+    }
+    async createSession(userId) {
+        return await this._storage.create(this._validityToken, this._tokenLength, userId);
     }
     middleware = async (context, next) => {
         let session;
@@ -36,7 +45,7 @@ export class SignedRequestsManager {
             if (sessionId && timestamp && signature) {
                 const { sessionId: _, timestamp: __, signature: ___, ...other } = parameters;
                 const otherParameters = Object.entries(other);
-                session = await this._storage.validate(sessionId, timestamp, otherParameters, signature);
+                session = await this._storage.validate(this._validitySignature, this._validityToken, sessionId, timestamp, otherParameters, signature);
             }
         }
         catch (error) {

@@ -4,26 +4,20 @@ export class SessionsStorageLocal {
     _maxSessions;
     _maxSessionsPerUser;
     _cleanupSessionLimit;
-    _validitySignature;
-    _validityToken;
-    _tokenLength;
     _sessionsById = new Map();
     _sessionsByUserId = new Map();
     constructor(options) {
         this._maxSessions = options?.maxSessions ?? 0xFFFF;
         this._maxSessionsPerUser = options?.maxSessionsPerUser ?? 3;
         this._cleanupSessionLimit = Math.floor(this._maxSessions * 0.75);
-        this._validitySignature = options?.validitySignature ?? 5000;
-        this._validityToken = options?.validityToken ?? 60 * 60000;
-        this._tokenLength = options?.tokenLength ?? 32;
     }
-    async validate(sessionId, timestamp, parameters, signature) {
+    async validate(validitySignature, validityToken, sessionId, timestamp, parameters, signature) {
         let returnValue;
         const now = Date.now();
-        if ((now > timestamp) && (now < timestamp + this._validitySignature)) {
+        if ((now > timestamp) && (now < timestamp + validitySignature)) {
             if (this._sessionsById.has(sessionId)) {
                 const session = this._sessionsById.get(sessionId);
-                if (now < session.lastUsed + this._validityToken) {
+                if (now < session.lastUsed + validityToken) {
                     const parametersOrdered = [
                         ['sessionId', session.id],
                         ['sequenceNumber', session.sequenceNumber],
@@ -48,13 +42,13 @@ export class SessionsStorageLocal {
         }
         return returnValue;
     }
-    async create(userId) {
+    async create(validityToken, tokenLength, userId) {
         let returnValue;
         const now = Date.now();
         if (this._sessionsById.size > this._cleanupSessionLimit) {
-            await Promise.all(Array.from(this._sessionsById.entries()).filter(([_, session]) => now > (session.lastUsed + this._validityToken)).map(([sessionId, _]) => this.delete(sessionId)));
+            await Promise.all(Array.from(this._sessionsById.entries()).filter(([_, session]) => now > (session.lastUsed + validityToken)).map(([sessionId, _]) => this.delete(sessionId)));
         }
-        const usedIds = [...this._sessionsById.keys()].filter((sessionId) => (now <= (this._sessionsById.get(sessionId).lastUsed + this._validityToken))).sort((a, b) => a - b);
+        const usedIds = [...this._sessionsById.keys()].filter((sessionId) => (now <= (this._sessionsById.get(sessionId).lastUsed + validityToken))).sort((a, b) => a - b);
         const sessionsRange = this._maxSessions - usedIds.length;
         if (sessionsRange > 0) {
             let sessionId = randomInt(0, this._maxSessions - usedIds.length);
@@ -72,14 +66,14 @@ export class SessionsStorageLocal {
             sessionId = (sessionId + left) >>> 0;
             const session = this._sessionsById.get(sessionId);
             if (session) {
-                if (now > session.lastUsed + this._validityToken) {
+                if (now > session.lastUsed + validityToken) {
                     await this.delete(sessionId);
                 }
                 else {
                     throw new Error(`Session ${sessionId} already in use`);
                 }
             }
-            const token = randomBytes(this._tokenLength);
+            const token = randomBytes(tokenLength);
             returnValue = {
                 id: sessionId,
                 userId,
