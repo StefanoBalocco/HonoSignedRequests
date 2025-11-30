@@ -175,7 +175,7 @@ class SignedRequester {
                 if (returnValue.ok) {
                     this._incrementSequenceNumber();
                 }
-                else if (403 === returnValue.status) {
+                else if (401 === returnValue.status) {
                     this.clearSession();
                 }
             }

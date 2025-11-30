@@ -1,15 +1,16 @@
 # @stefanobalocco/honosignedrequests
 
-A Hono middleware for HMAC-SHA256 signed requests with replay attack protection via sequence numbers.
+A Hono middleware for HMAC-SHA256 signed requests.
 
 ## Overview
 
-This library provides server-side session management and request signature validation for Hono applications, along with a browser client for making signed requests.
+This library provides server-side session management and request signature validation for Hono applications, along with a client library for making signed requests.
 
 ### Authentication Mechanism
 
-Each session is associated with a cryptographic **token** (a random byte array) shared between client and server. Every request is authenticated by computing an HMAC-SHA256 signature using this token as the secret key. The signature is computed over:
+Each session is associated with a cryptographic token (a random byte array) shared between client and server. Every request is authenticated by computing an HMAC-SHA256 signature using this token as the secret key.
 
+The signature is computed over:
 - Session ID
 - Sequence number (monotonically increasing to prevent replay attacks)
 - Timestamp (to limit signature validity window)
@@ -18,11 +19,10 @@ Each session is associated with a cryptographic **token** (a random byte array) 
 The server validates the signature using the same token, verifies the timestamp falls within the allowed window, and checks that the sequence number is the expected next value for that session.
 
 ## Features
-
 - HMAC-SHA256 request signing with shared secret token
 - Replay attack protection via monotonic sequence numbers
-- Timestamp validation with configurable tolerance
-- Constant-time signature comparison
+- Timestamp validation with configurable tolerance, to prevent delayed replay
+- Constant-time signature comparison, to prevent timing attacks
 - Pluggable session storage architecture
 - Works with Node.js, Cloudflare Workers, Deno, and Bun
 
@@ -278,19 +278,6 @@ import { SessionsStorage } from '@stefanobalocco/honosignedrequests';
 import { Session } from '@stefanobalocco/honosignedrequests';
 
 class RedisSessionsStorage extends SessionsStorage {
-  async validate(
-    validitySignature: number,
-    validityToken: number,
-    sessionId: number,
-    timestamp: number,
-    parameters: [string, any][],
-    signature: Uint8Array<ArrayBuffer>
-  ): Promise<Session | undefined> {
-    // Implement validation logic with Redis
-    // Use validitySignature to check timestamp window
-    // Use validityToken to verify session hasn't expired
-  }
-
   async create(
     validityToken: number,
     tokenLength: number,
@@ -301,20 +288,25 @@ class RedisSessionsStorage extends SessionsStorage {
     // Use validityToken for Redis TTL or expiration tracking
     // Implement your own maxSessionsPerUser logic if needed
   }
+
+  async getBySessionId(sessionId: number): Promise<Session | undefined> {
+    // Implement session lookup with Redis
+  }
+
+  async getByUserId(userId: number): Promise<Session[]> {
+    // Implement session lookup with Redis
+  }
+
+  async delete(sessionId: number): Promise<void> {
+    // Implement session deletion with Redis
+  }
 }
 ```
 
-The generic parameters (`validitySignature`, `validityToken`, `tokenLength`) are passed by `SignedRequestsManager` to your storage implementation. Storage-specific behaviors like `maxSessionsPerUser` limits should be implemented according to your storage's characteristics (e.g., Redis TTL, database triggers, etc.).
-
-## Security Considerations
-
-- The session **token** is the cryptographic secret used for HMAC signature computation
-- The token is randomly generated during session creation and shared only once with the client
-- The sequence number increments with each successful request, preventing replay attacks
-- Timestamps are validated within a configurable window to prevent delayed replay
-- Signatures use constant-time comparison to prevent timing attacks
-- Sessions automatically expire and are cleaned up
-- Invalid sessions return 403 and trigger client-side session clearing
+## Considerations
+- Storage should expire sessions
+- Invalid sessions should return 401 and trigger client-side session clearing
+- Client should be forced to serialize requests, otherwise out-of-order sequence number may arise triggering a session cleanup.
 
 ## License
 

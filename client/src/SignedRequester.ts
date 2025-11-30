@@ -302,8 +302,8 @@ class SignedRequester {
 				// Increment sequence number on successful request
 				if( returnValue.ok ) {
 					this._incrementSequenceNumber();
-				} else if( 403 === returnValue.status ) {
-					// Session non valida, cancella tutto
+				} else if( 401 === returnValue.status ) {
+					// Invalid session
 					this.clearSession();
 				}
 			} else {
