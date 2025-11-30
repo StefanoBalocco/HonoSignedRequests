@@ -1,0 +1,15 @@
+{
+  "name": "@stefanobalocco/honosignedrequests",
+  "version": "1.0.0",
+  "description": "An hono middleware to manage signed requests, including a client implementation.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "hono": "^4.10.6",
+    "typescript": "^5.5.3"
+  },
+  "private": true
+}
