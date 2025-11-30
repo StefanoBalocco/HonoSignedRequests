@@ -41,7 +41,7 @@ export class SignedRequestsManager {
 		let returnValue: Undefinedable<Session>;
 		const now: number = Date.now();
 		if( ( now > timestamp ) && ( now < timestamp + this._validitySignature ) ) {
-			const session : Undefinedable<Session>= await this._storage.get( sessionId );
+			const session: Undefinedable<Session> = await this._storage.getBySessionId( sessionId );
 			if( session ) {
 				if( now < session.lastUsed + this._validityToken ) {
 					const parametersOrdered: [ string, any ][] = [

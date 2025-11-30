@@ -38,6 +38,5 @@
     "session",
     "authentication"
   ],
-  "license": "BSD-3-Clause",
-  "private": true
+  "license": "BSD-3-Clause"
 }

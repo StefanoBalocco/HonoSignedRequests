@@ -22,7 +22,7 @@ export class SignedRequestsManager {
         let returnValue;
         const now = Date.now();
         if ((now > timestamp) && (now < timestamp + this._validitySignature)) {
-            const session = await this._storage.get(sessionId);
+            const session = await this._storage.getBySessionId(sessionId);
             if (session) {
                 if (now < session.lastUsed + this._validityToken) {
                     const parametersOrdered = [

@@ -15,6 +15,6 @@ export declare class SessionsStorageLocal implements SessionsStorage {
     create(validityToken: number, tokenLength: number, userId: number): Promise<Session>;
     delete(sessionId: number): Promise<boolean>;
     getByUserId(userId: number): Promise<Session[]>;
-    get(sessionId: number): Promise<Undefinedable<Session>>;
+    getBySessionId(sessionId: number): Promise<Undefinedable<Session>>;
 }
 export {};

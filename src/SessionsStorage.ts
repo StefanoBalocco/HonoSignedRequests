@@ -8,9 +8,13 @@ export abstract class SessionsStorage {
 		userId: number
 	): Promise<Session>;
 
-	abstract get(
+	abstract getBySessionId(
 		sessionId: number
 	): Promise<Undefinedable<Session>>;
+
+	abstract getByUserId(
+		userId: number
+	): Promise<Session[]>;
 
 	abstract delete(
 		sessionId: number

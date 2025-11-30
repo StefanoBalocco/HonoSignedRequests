@@ -82,7 +82,7 @@ export class SessionsStorageLocal {
     async getByUserId(userId) {
         return this._sessionsByUserId.get(userId) ?? [];
     }
-    async get(sessionId) {
+    async getBySessionId(sessionId) {
         return this._sessionsById.get(sessionId);
     }
 }

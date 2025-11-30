@@ -115,7 +115,7 @@ export class SessionsStorageLocal implements SessionsStorage {
 		return this._sessionsByUserId.get( userId ) ?? [];
 	}
 
-	async get( sessionId: number ): Promise<Undefinedable<Session>> {
+	async getBySessionId( sessionId: number ): Promise<Undefinedable<Session>> {
 		return this._sessionsById.get( sessionId );
 	}
 }
