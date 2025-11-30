@@ -220,5 +220,4 @@ SignedRequester._primitives = new Set([
     'string',
     'number'
 ]);
-export const sessionManager = new SignedRequester();
 export { SignedRequester };

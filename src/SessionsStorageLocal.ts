@@ -1,4 +1,4 @@
-import { constantTimeEqual, hmacSha256, randomBytes, randomInt, Undefinedable } from './Common';
+import { randomBytes, randomInt, Undefinedable } from './Common';
 import { Session } from './Session';
 import { SessionsStorage } from './SessionsStorage';
 
@@ -8,7 +8,6 @@ type SessionStorageLocalConfig = {
 };
 
 export class SessionsStorageLocal implements SessionsStorage {
-	private readonly _primitives: Set<string> = new Set( [ 'string', 'number', 'boolean' ] );
 	private readonly _maxSessions: number;
 	private readonly _maxSessionsPerUser: number;
 	private readonly _cleanupSessionLimit: number;
@@ -20,48 +19,6 @@ export class SessionsStorageLocal implements SessionsStorage {
 		this._maxSessions = options?.maxSessions ?? 0xFFFF;
 		this._maxSessionsPerUser = options?.maxSessionsPerUser ?? 3;
 		this._cleanupSessionLimit = Math.floor( this._maxSessions * 0.75 );
-	}
-
-	async validate(
-		validitySignature: number,
-		validityToken: number,
-		sessionId: number,
-		timestamp: number,
-		parameters: [ string, any ][],
-		signature: Uint8Array<ArrayBuffer>
-	): Promise<Undefinedable<Session>> {
-		let returnValue: Undefinedable<Session>;
-		const now: number = Date.now();
-		if( ( now > timestamp ) && ( now < timestamp + validitySignature ) ) {
-			if( this._sessionsById.has( sessionId ) ) {
-				const session: Session = this._sessionsById.get( sessionId )!;
-				if( now < session.lastUsed + validityToken ) {
-					const parametersOrdered: [ string, any ][] = [
-						[ 'sessionId', session.id ],
-						[ 'sequenceNumber', session.sequenceNumber ],
-						[ 'timestamp', timestamp ],
-						...parameters.sort(
-							( a: [ string, string | number ], b: [ string, string | number ] ): number => a[ 0 ].localeCompare( b[ 0 ] )
-						)
-					];
-					const dataToSign: string = parametersOrdered.map(
-						( [ name, value ]: [ string, any ] ): string => {
-							const serializedValue: string = ( this._primitives.has( typeof value ) || null === value ) ? String( value ) : JSON.stringify( value );
-							return `${ name }=${ serializedValue }`;
-						}
-					).join( ';' );
-					const signatureExpected: Uint8Array<ArrayBuffer> = await hmacSha256( session.token, dataToSign );
-					if( constantTimeEqual( signature, signatureExpected ) ) {
-						session.lastUsed = now;
-						session.sequenceNumber++;
-						returnValue = session;
-					}
-				} else {
-					this._sessionsById.delete( sessionId );
-				}
-			}
-		}
-		return returnValue;
 	}
 
 	async create( validityToken: number, tokenLength: number, userId: number ): Promise<Session> {
@@ -154,11 +111,11 @@ export class SessionsStorageLocal implements SessionsStorage {
 		return returnValue;
 	}
 
-	async getSessionsByUserId( userId: number ): Promise<Session[]> {
+	async getByUserId( userId: number ): Promise<Session[]> {
 		return this._sessionsByUserId.get( userId ) ?? [];
 	}
 
-	async getSessionBySessionId( sessionId: number ): Promise<Undefinedable<Session>> {
+	async get( sessionId: number ): Promise<Undefinedable<Session>> {
 		return this._sessionsById.get( sessionId );
 	}
 }

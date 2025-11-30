@@ -1,6 +1,5 @@
-import { constantTimeEqual, hmacSha256, randomBytes, randomInt } from './Common';
+import { randomBytes, randomInt } from './Common';
 export class SessionsStorageLocal {
-    _primitives = new Set(['string', 'number', 'boolean']);
     _maxSessions;
     _maxSessionsPerUser;
     _cleanupSessionLimit;
@@ -10,37 +9,6 @@ export class SessionsStorageLocal {
         this._maxSessions = options?.maxSessions ?? 0xFFFF;
         this._maxSessionsPerUser = options?.maxSessionsPerUser ?? 3;
         this._cleanupSessionLimit = Math.floor(this._maxSessions * 0.75);
-    }
-    async validate(validitySignature, validityToken, sessionId, timestamp, parameters, signature) {
-        let returnValue;
-        const now = Date.now();
-        if ((now > timestamp) && (now < timestamp + validitySignature)) {
-            if (this._sessionsById.has(sessionId)) {
-                const session = this._sessionsById.get(sessionId);
-                if (now < session.lastUsed + validityToken) {
-                    const parametersOrdered = [
-                        ['sessionId', session.id],
-                        ['sequenceNumber', session.sequenceNumber],
-                        ['timestamp', timestamp],
-                        ...parameters.sort((a, b) => a[0].localeCompare(b[0]))
-                    ];
-                    const dataToSign = parametersOrdered.map(([name, value]) => {
-                        const serializedValue = (this._primitives.has(typeof value) || null === value) ? String(value) : JSON.stringify(value);
-                        return `${name}=${serializedValue}`;
-                    }).join(';');
-                    const signatureExpected = await hmacSha256(session.token, dataToSign);
-                    if (constantTimeEqual(signature, signatureExpected)) {
-                        session.lastUsed = now;
-                        session.sequenceNumber++;
-                        returnValue = session;
-                    }
-                }
-                else {
-                    this._sessionsById.delete(sessionId);
-                }
-            }
-        }
-        return returnValue;
     }
     async create(validityToken, tokenLength, userId) {
         let returnValue;
@@ -111,10 +79,10 @@ export class SessionsStorageLocal {
         }
         return returnValue;
     }
-    async getSessionsByUserId(userId) {
+    async getByUserId(userId) {
         return this._sessionsByUserId.get(userId) ?? [];
     }
-    async getSessionBySessionId(sessionId) {
+    async get(sessionId) {
         return this._sessionsById.get(sessionId);
     }
 }

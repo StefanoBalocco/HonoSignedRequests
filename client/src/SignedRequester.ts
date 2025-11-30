@@ -358,9 +358,6 @@ class SignedRequester {
 // Exports
 // ============================================================================
 
-// Export singleton instance (without baseUrl, uses relative paths)
-export const sessionManager = new SignedRequester();
-
 // Export types
 export type { SessionConfig, SignedRequest, SignedRequestOptions };
 

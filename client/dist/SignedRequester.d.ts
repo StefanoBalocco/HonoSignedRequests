@@ -33,6 +33,5 @@ declare class SignedRequester {
     signedRequest(path: string, parameters: Record<string, any>, options?: SignedRequestOptions): Promise<Response>;
     signedRequestJson<T = any>(path: string, parameters: Record<string, any>, options?: SignedRequestOptions): Promise<T>;
 }
-export declare const sessionManager: SignedRequester;
 export type { SessionConfig, SignedRequest, SignedRequestOptions };
 export { SignedRequester };

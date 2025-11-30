@@ -1,5 +1,5 @@
 import { Context, MiddlewareHandler, Next } from 'hono';
-import { fromBase64Url, Undefinedable } from './Common';
+import { constantTimeEqual, fromBase64Url, hmacSha256, Undefinedable } from './Common';
 import { Session } from './Session';
 import { SessionsStorage } from './SessionsStorage';
 import { SessionsStorageLocal } from './SessionsStorageLocal';
@@ -11,6 +11,7 @@ type SignedRequestsManagerConfig = {
 };
 
 export class SignedRequestsManager {
+	private static readonly _primitives: Set<string> = new Set( [ 'string', 'number', 'boolean' ] );
 	private readonly _storage: SessionsStorage;
 	private readonly _validitySignature: number;
 	private readonly _validityToken: number;
@@ -29,6 +30,46 @@ export class SignedRequestsManager {
 
 	async createSession( userId: number ): Promise<Session> {
 		return await this._storage.create( this._validityToken, this._tokenLength, userId );
+	}
+
+	async validate(
+		sessionId: number,
+		timestamp: number,
+		parameters: [ string, any ][],
+		signature: Uint8Array<ArrayBuffer>
+	): Promise<Undefinedable<Session>> {
+		let returnValue: Undefinedable<Session>;
+		const now: number = Date.now();
+		if( ( now > timestamp ) && ( now < timestamp + this._validitySignature ) ) {
+			const session : Undefinedable<Session>= await this._storage.get( sessionId );
+			if( session ) {
+				if( now < session.lastUsed + this._validityToken ) {
+					const parametersOrdered: [ string, any ][] = [
+						[ 'sessionId', session.id ],
+						[ 'sequenceNumber', session.sequenceNumber ],
+						[ 'timestamp', timestamp ],
+						...parameters.sort(
+							( a: [ string, string | number ], b: [ string, string | number ] ): number => a[ 0 ].localeCompare( b[ 0 ] )
+						)
+					];
+					const dataToSign: string = parametersOrdered.map(
+						( [ name, value ]: [ string, any ] ): string => {
+							const serializedValue: string = ( SignedRequestsManager._primitives.has( typeof value ) || null === value ) ? String( value ) : JSON.stringify( value );
+							return `${ name }=${ serializedValue }`;
+						}
+					).join( ';' );
+					const signatureExpected: Uint8Array<ArrayBuffer> = await hmacSha256( session.token, dataToSign );
+					if( constantTimeEqual( signature, signatureExpected ) ) {
+						session.lastUsed = now;
+						session.sequenceNumber++;
+						returnValue = session;
+					}
+				} else {
+					await this._storage.delete( sessionId );
+				}
+			}
+		}
+		return returnValue;
 	}
 
 	middleware: MiddlewareHandler = async( context: Context<{ Variables: { session?: Session } }>, next: Next ): Promise<void> => {
@@ -67,9 +108,7 @@ export class SignedRequestsManager {
 				// Converte in array di tuple per sessionValidate
 				const otherParameters: [ string, string ][] = Object.entries( other );
 
-				session = await this._storage.validate(
-					this._validitySignature,
-					this._validityToken,
+				session = await this.validate(
 					sessionId,
 					timestamp,
 					otherParameters,

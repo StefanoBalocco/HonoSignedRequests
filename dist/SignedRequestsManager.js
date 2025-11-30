@@ -1,6 +1,7 @@
-import { fromBase64Url } from './Common';
+import { constantTimeEqual, fromBase64Url, hmacSha256 } from './Common';
 import { SessionsStorageLocal } from './SessionsStorageLocal';
 export class SignedRequestsManager {
+    static _primitives = new Set(['string', 'number', 'boolean']);
     _storage;
     _validitySignature;
     _validityToken;
@@ -16,6 +17,37 @@ export class SignedRequestsManager {
     }
     async createSession(userId) {
         return await this._storage.create(this._validityToken, this._tokenLength, userId);
+    }
+    async validate(sessionId, timestamp, parameters, signature) {
+        let returnValue;
+        const now = Date.now();
+        if ((now > timestamp) && (now < timestamp + this._validitySignature)) {
+            const session = await this._storage.get(sessionId);
+            if (session) {
+                if (now < session.lastUsed + this._validityToken) {
+                    const parametersOrdered = [
+                        ['sessionId', session.id],
+                        ['sequenceNumber', session.sequenceNumber],
+                        ['timestamp', timestamp],
+                        ...parameters.sort((a, b) => a[0].localeCompare(b[0]))
+                    ];
+                    const dataToSign = parametersOrdered.map(([name, value]) => {
+                        const serializedValue = (SignedRequestsManager._primitives.has(typeof value) || null === value) ? String(value) : JSON.stringify(value);
+                        return `${name}=${serializedValue}`;
+                    }).join(';');
+                    const signatureExpected = await hmacSha256(session.token, dataToSign);
+                    if (constantTimeEqual(signature, signatureExpected)) {
+                        session.lastUsed = now;
+                        session.sequenceNumber++;
+                        returnValue = session;
+                    }
+                }
+                else {
+                    await this._storage.delete(sessionId);
+                }
+            }
+        }
+        return returnValue;
     }
     middleware = async (context, next) => {
         let session;
@@ -45,7 +77,7 @@ export class SignedRequestsManager {
             if (sessionId && timestamp && signature) {
                 const { sessionId: _, timestamp: __, signature: ___, ...other } = parameters;
                 const otherParameters = Object.entries(other);
-                session = await this._storage.validate(this._validitySignature, this._validityToken, sessionId, timestamp, otherParameters, signature);
+                session = await this.validate(sessionId, timestamp, otherParameters, signature);
             }
         }
         catch (error) {

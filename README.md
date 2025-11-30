@@ -144,113 +144,105 @@ These are specific to the in-memory implementation:
 
 ```html
 <script type="module">
-  import { sessionManager } from 'https://cdn.example.com/honosignedrequests/dist/client/SignedRequester.js';
+  import { SignedRequester } from 'https://cdn.jsdelivr.net/gh/StefanoBalocco/HonoSignedRequests/client/dist/SignedRequester.min.js';
+  
+  const requester = new SignedRequester();
+  // You can also specify a base URL for request
+  //const requester = new SignedRequester('https://api.example.com');
   
   // Check if we have session data stored
-  if (sessionManager.getSession()) {
+  let needLogin = true;
+  if (requester.getSession()) {
     // Try to verify the session is still valid
     try {
-      const pingResponse = await sessionManager.signedRequestJson('/api/ping', {});
+      const response = await requester.signedRequestJson('/api/ping', {});
       
-      if (!pingResponse?.pong) {
-        // Session invalid or expired, need to login
-        await login();
+      if (response?.pong) {
+        needLogin = false;
       }
     } catch (error) {
-      // Network error or session invalid, need to login
-      await login();
     }
-  } else {
+  }
+  
+  if( needLogin ) {
     // No session data, need to login
-    await login();
+		const response = await fetch('/auth/login', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				username: 'user@example.com',
+				password: 'password123'
+			})
+		});
+
+		const loginData = await response.json();
+
+		// Store session credentials
+		requester.setSession({
+			sessionId: loginData.sessionId,
+			token: loginData.token,
+			sequenceNumber: loginData.sequenceNumber
+		});
   }
   
   // Now we're authenticated, make protected requests
-  const data = await sessionManager.signedRequestJson('/api/protected', {
+  const data = await requester.signedRequestJson('/api/protected', {
     action: 'getData'
   });
-  
-  async function login() {
-    const response = await fetch('/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: 'user@example.com',
-        password: 'password123'
-      })
-    });
-    
-    const loginData = await response.json();
-    
-    // Store session credentials
-    sessionManager.setSession({
-      sessionId: loginData.sessionId,
-      token: loginData.token,
-      sequenceNumber: loginData.sequenceNumber
-    });
-  }
 </script>
-```
-
-### Custom Instance
-
-```javascript
-import { SessionManager } from 'https://cdn.example.com/honosignedrequests/dist/client/SignedRequester.js';
-
-const session = new SessionManager('https://api.example.com');
 ```
 
 ### Client API
 
-#### `sessionManager.setSession(config)`
+#### `setSession(config)`
 
 Initialize session after login.
 
 ```javascript
-sessionManager.setSession({
+requester.setSession({
   sessionId: 12345,
   token: 'base64url_encoded_token',
   sequenceNumber: 1
 });
 ```
 
-#### `sessionManager.getSession()`
+#### `getSession()`
 
 Check if a valid session exists. Loads from localStorage if not in memory.
 
 ```javascript
-if (sessionManager.getSession()) {
+if (requester.getSession()) {
   // Session available
 }
 ```
 
-#### `sessionManager.signedRequest(path, parameters, options?)`
+#### `signedRequest(path, parameters, options?)`
 
 Make a signed request, returns the raw Response object.
 
 ```javascript
-const response = await sessionManager.signedRequest('/api/action', {
+const response = await requester.signedRequest('/api/action', {
   param1: 'value1',
   param2: 123
 });
 ```
 
-#### `sessionManager.signedRequestJson<T>(path, parameters, options?)`
+#### `signedRequestJson<T>(path, parameters, options?)`
 
 Make a signed request and parse JSON response.
 
 ```javascript
-const data = await sessionManager.signedRequestJson('/api/data', {
+const data = await requester.signedRequestJson('/api/data', {
   query: 'example'
 });
 ```
 
-#### `sessionManager.clearSession()`
+#### `clearSession()`
 
-Clear session data (logout).
+Clear session data (for example after you do a logout).
 
 ```javascript
-sessionManager.clearSession();
+requester.clearSession();
 ```
 
 ### Request Options
