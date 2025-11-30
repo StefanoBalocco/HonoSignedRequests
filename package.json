@@ -4,12 +4,40 @@
   "description": "An hono middleware to manage signed requests, including a client implementation.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/SignedRequester.d.ts",
+      "import": "./dist/client/SignedRequester.min.js"
+    }
+  },
   "scripts": {
-    "build": "tsc"
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "tsc",
+    "build:client": "tsc -p tsconfig.client.json && terser dist/client/SignedRequester.js -o dist/client/SignedRequester.min.js --toplevel -m -c --mangle-props regex=/^_/"
   },
   "devDependencies": {
     "hono": "^4.10.6",
+    "terser": "^5.44.1",
     "typescript": "^5.5.3"
   },
+  "peerDependencies": {
+    "hono": "^4.0.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "hono",
+    "middleware",
+    "hmac",
+    "signed-requests",
+    "session",
+    "authentication"
+  ],
+  "license": "BSD-3-Clause",
   "private": true
 }

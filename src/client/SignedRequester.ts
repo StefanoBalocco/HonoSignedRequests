@@ -4,6 +4,7 @@
  */
 
 type Undefinedable<T> = T | undefined;
+
 type SessionConfig = {
 	sessionId: number;
 	token: string; // Base64URL encoded
@@ -44,8 +45,8 @@ function _base64url_encode(value: Uint8Array): string {
 	return returnValue;
 }
 
-function _base64url_decode(value: string): Undefinedable<Uint8Array> {
-	let returnValue: Undefinedable<Uint8Array>;
+function _base64url_decode(value: string): Undefinedable<Uint8Array<ArrayBuffer>> {
+	let returnValue: Undefinedable<Uint8Array<ArrayBuffer>>;
 	if (0 < value?.length && /^[A-Za-z0-9_-]*$/.test(value)) {
 		const padding = value.length % 4;
 		const paddedValue =
@@ -71,7 +72,7 @@ function _base64url_decode(value: string): Undefinedable<Uint8Array> {
 // Session Management
 // ============================================================================
 
-class SessionManager {
+class SignedRequester {
 	private static readonly _primitives: Set<string> = new Set([
 		'undefined',
 		'string',
@@ -80,7 +81,7 @@ class SessionManager {
 	
 	// Cache a livello di modulo
 	private _sessionId: Undefinedable<number>;
-	private _token: Undefinedable<Uint8Array>;
+	private _token: Undefinedable<Uint8Array<ArrayBuffer>>;
 	private _sequenceNumber: Undefinedable<number>;
 	private _baseUrl: Undefinedable<string>;
 	
@@ -186,7 +187,7 @@ class SessionManager {
 	 * Call this once at page load
 	 */
 	public getSession(): boolean {
-		let returnValue: boolean = false;
+		let returnValue: boolean;
 		
 		// Check cache first
 		if (
@@ -252,7 +253,7 @@ class SessionManager {
 				const dataToSign = parametersOrdered
 					.map(([name, value]: [string, any]): string => {
 						const serializedValue: string =
-							SessionManager._primitives.has(typeof value) || null === value
+							SignedRequester._primitives.has(typeof value) || null === value
 								? String(value)
 								: JSON.stringify(value);
 						return `${name}=${serializedValue}`;
@@ -359,10 +360,10 @@ class SessionManager {
 // ============================================================================
 
 // Export singleton instance (without baseUrl, uses relative paths)
-export const sessionManager = new SessionManager();
-
-// Export class for custom instances
-export { SessionManager };
+export const sessionManager = new SignedRequester();
 
 // Export types
 export type { SessionConfig, SignedRequest, SignedRequestOptions };
+
+// Export class for custom instances
+export { SignedRequester };

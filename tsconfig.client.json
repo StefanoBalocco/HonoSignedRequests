@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "outDir": "dist",
-    "target": "esnext",
+    "outDir": "dist/client",
+    "target": "es2020",
     "module": "esnext",
     "moduleResolution": "bundler",
     "declaration": true,
@@ -15,12 +15,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "lib": ["es2020", "dom"]
   },
   "include": [
-    "src/index.ts"
-  ],
-  "exclude": [
-    "src/SignedRequester.ts"
+    "src/client/SignedRequester.ts"
   ]
 }
