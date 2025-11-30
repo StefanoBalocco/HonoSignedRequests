@@ -5,9 +5,6 @@ import { SessionsStorage } from './SessionsStorage';
 type SessionStorageLocalConfig = {
 	maxSessions: number;
 	maxSessionsPerUser: number;
-	validitySignature: number;
-	validityToken: number;
-	tokenLength: number;
 };
 
 export class SessionsStorageLocal implements SessionsStorage {
@@ -15,9 +12,6 @@ export class SessionsStorageLocal implements SessionsStorage {
 	private readonly _maxSessions: number;
 	private readonly _maxSessionsPerUser: number;
 	private readonly _cleanupSessionLimit: number;
-	private readonly _validitySignature: number;
-	private readonly _validityToken: number;
-	private readonly _tokenLength: number;
 
 	private _sessionsById: Map<number, Session> = new Map<number, Session>();
 	private _sessionsByUserId: Map<number, Session[]> = new Map<number, Session[]>();
@@ -26,12 +20,11 @@ export class SessionsStorageLocal implements SessionsStorage {
 		this._maxSessions = options?.maxSessions ?? 0xFFFF;
 		this._maxSessionsPerUser = options?.maxSessionsPerUser ?? 3;
 		this._cleanupSessionLimit = Math.floor( this._maxSessions * 0.75 );
-		this._validitySignature = options?.validitySignature ?? 5000;
-		this._validityToken = options?.validityToken ?? 60 * 60000;
-		this._tokenLength = options?.tokenLength ?? 32;
 	}
 
 	async validate(
+		validitySignature: number,
+		validityToken: number,
 		sessionId: number,
 		timestamp: number,
 		parameters: [ string, any ][],
@@ -39,10 +32,10 @@ export class SessionsStorageLocal implements SessionsStorage {
 	): Promise<Undefinedable<Session>> {
 		let returnValue: Undefinedable<Session>;
 		const now: number = Date.now();
-		if( ( now > timestamp ) && ( now < timestamp + this._validitySignature ) ) {
+		if( ( now > timestamp ) && ( now < timestamp + validitySignature ) ) {
 			if( this._sessionsById.has( sessionId ) ) {
 				const session: Session = this._sessionsById.get( sessionId )!;
-				if( now < session.lastUsed + this._validityToken ) {
+				if( now < session.lastUsed + validityToken ) {
 					const parametersOrdered: [ string, any ][] = [
 						[ 'sessionId', session.id ],
 						[ 'sequenceNumber', session.sequenceNumber ],
@@ -71,24 +64,24 @@ export class SessionsStorageLocal implements SessionsStorage {
 		return returnValue;
 	}
 
-	async create( userId: number ): Promise<Session> {
+	async create( validityToken: number, tokenLength: number, userId: number ): Promise<Session> {
 		let returnValue: Session;
-		const now = Date.now();
+		const now: number = Date.now();
 
 		if( this._sessionsById.size > this._cleanupSessionLimit ) {
 			await Promise.all(
 				Array.from(
 					this._sessionsById.entries()
 				).filter(
-					( [ _, session ]: [ number, Session ] ): boolean => now > ( session.lastUsed + this._validityToken )
+					( [ _, session ]: [ number, Session ] ): boolean => now > ( session.lastUsed + validityToken )
 				).map(
 					( [ sessionId, _ ]: [ number, Session ] ): Promise<boolean> => this.delete( sessionId ) )
 			);
 		}
 
 		const usedIds: number[] = [ ...this._sessionsById.keys() ].filter(
-			( sessionId: number ): boolean => ( now <= ( this._sessionsById.get( sessionId )!.lastUsed + this._validityToken ) )
-		).sort( ( a: number, b: number ) => a - b );
+			( sessionId: number ): boolean => ( now <= ( this._sessionsById.get( sessionId )!.lastUsed + validityToken ) )
+		).sort( ( a: number, b: number ): number => a - b );
 
 		const sessionsRange: number = this._maxSessions - usedIds.length;
 		if( sessionsRange > 0 ) {
@@ -108,13 +101,14 @@ export class SessionsStorageLocal implements SessionsStorage {
 
 			const session: Undefinedable<Session> = this._sessionsById.get( sessionId );
 			if( session ) {
-				if( now > session.lastUsed + this._validityToken ) {
+				if( now > session.lastUsed + validityToken ) {
 					await this.delete( sessionId );
 				} else {
 					throw new Error( `Session ${ sessionId } already in use` );
 				}
 			}
-			const token: Uint8Array<ArrayBuffer> = randomBytes( this._tokenLength );
+
+			const token: Uint8Array<ArrayBuffer> = randomBytes( tokenLength );
 
 			returnValue = {
 				id: sessionId,
@@ -146,7 +140,7 @@ export class SessionsStorageLocal implements SessionsStorage {
 	}
 
 	async delete( sessionId: number ): Promise<boolean> {
-		let returnValue = false;
+		let returnValue: boolean = false;
 		const session: Undefinedable<Session> = this._sessionsById.get( sessionId );
 		if( session ) {
 			returnValue = true;

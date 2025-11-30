@@ -4,14 +4,31 @@ import { Session } from './Session';
 import { SessionsStorage } from './SessionsStorage';
 import { SessionsStorageLocal } from './SessionsStorageLocal';
 
+type SignedRequestsManagerConfig = {
+	validitySignature: number;
+	validityToken: number;
+	tokenLength: number;
+};
+
 export class SignedRequestsManager {
 	private readonly _storage: SessionsStorage;
+	private readonly _validitySignature: number;
+	private readonly _validityToken: number;
+	private readonly _tokenLength: number;
 
-	constructor( storage?: SessionsStorage ) {
+	constructor( storage?: SessionsStorage, options?: Partial<SignedRequestsManagerConfig> ) {
+		this._validitySignature = options?.validitySignature ?? 5000;
+		this._validityToken = options?.validityToken ?? 60 * 60000;
+		this._tokenLength = options?.tokenLength ?? 32;
+
 		if( !storage ) {
 			storage = new SessionsStorageLocal();
 		}
 		this._storage = storage;
+	}
+
+	async createSession( userId: number ): Promise<Session> {
+		return await this._storage.create( this._validityToken, this._tokenLength, userId );
 	}
 
 	middleware: MiddlewareHandler = async( context: Context<{ Variables: { session?: Session } }>, next: Next ): Promise<void> => {
@@ -51,6 +68,8 @@ export class SignedRequestsManager {
 				const otherParameters: [ string, string ][] = Object.entries( other );
 
 				session = await this._storage.validate(
+					this._validitySignature,
+					this._validityToken,
 					sessionId,
 					timestamp,
 					otherParameters,

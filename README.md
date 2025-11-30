@@ -4,16 +4,26 @@ A Hono middleware for HMAC-SHA256 signed requests with replay attack protection 
 
 ## Overview
 
-This library provides server-side session management and request signature validation for Hono applications, along with a browser client for making signed requests. Each request is authenticated using HMAC-SHA256 signatures computed over the request parameters, timestamp, and an incrementing sequence number that prevents replay attacks.
+This library provides server-side session management and request signature validation for Hono applications, along with a browser client for making signed requests.
+
+### Authentication Mechanism
+
+Each session is associated with a cryptographic **token** (a random byte array) shared between client and server. Every request is authenticated by computing an HMAC-SHA256 signature using this token as the secret key. The signature is computed over:
+
+- Session ID
+- Sequence number (monotonically increasing to prevent replay attacks)
+- Timestamp (to limit signature validity window)
+- Request parameters (sorted alphabetically)
+
+The server validates the signature using the same token, verifies the timestamp falls within the allowed window, and checks that the sequence number is the expected next value for that session.
 
 ## Features
 
-- HMAC-SHA256 request signing
+- HMAC-SHA256 request signing with shared secret token
 - Replay attack protection via monotonic sequence numbers
 - Timestamp validation with configurable tolerance
 - Constant-time signature comparison
-- Session management with automatic cleanup
-- Per-user session limits
+- Pluggable session storage architecture
 - Works with Node.js, Cloudflare Workers, Deno, and Bun
 
 ## Installation
@@ -32,15 +42,19 @@ import { SignedRequestsManager, SessionsStorageLocal } from '@stefanobalocco/hon
 
 const app = new Hono();
 
+// SessionsStorageLocal is a simple in-memory storage implementation
+// You can implement your own SessionsStorage (e.g., Redis-based) for production
 const storage = new SessionsStorageLocal({
-  maxSessions: 65535,
-  maxSessionsPerUser: 3,
-  validitySignature: 5000,    // signature valid for 5 seconds
-  validityToken: 3600000,     // session valid for 1 hour
-  tokenLength: 32
+  maxSessions: 65535,         // Storage-specific: maximum concurrent sessions in memory
+  maxSessionsPerUser: 3       // Storage-specific: maximum sessions per user
 });
 
-const signedRequests = new SignedRequestsManager(storage);
+// Generic parameters are passed to SignedRequestsManager
+const signedRequests = new SignedRequestsManager(storage, {
+  validitySignature: 5000,      // signature valid for 5 seconds
+  validityToken: 3600000,       // session valid for 1 hour
+  tokenLength: 32               // token size in bytes
+});
 
 app.use('/api/*', signedRequests.middleware);
 ```
@@ -48,8 +62,6 @@ app.use('/api/*', signedRequests.middleware);
 ### Session Creation (Login Endpoint)
 
 ```typescript
-import { toBase64Url } from '@stefanobalocco/honosignedrequests';
-
 app.post('/auth/login', async (c) => {
   const { username, password } = await c.req.json();
   
@@ -60,9 +72,10 @@ app.post('/auth/login', async (c) => {
     return c.json({ error: 'Invalid credentials' }, 401);
   }
   
-  const session = await storage.create(userId);
+  // Use the manager's createSession method
+  const session = await signedRequests.createSession(userId);
   
-  // Convert token to Base64URL for transmission
+  // Convert token to Base64URL for transmission to client
   const tokenBase64 = btoa(String.fromCharCode(...session.token))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -73,6 +86,15 @@ app.post('/auth/login', async (c) => {
     token: tokenBase64,
     sequenceNumber: session.sequenceNumber
   });
+});
+```
+
+### Ping Endpoint (Verify Authentication)
+
+```typescript
+app.post('/api/ping', (c) => {
+  const session = c.get('session');
+  return c.json({ pong: !!session });
 });
 ```
 
@@ -93,15 +115,28 @@ app.post('/api/protected', (c) => {
 });
 ```
 
-### Configuration Options
+### Configuration
+
+The library separates **generic parameters** (common to all storage implementations) from **storage-specific parameters**.
+
+#### Generic Parameters (SignedRequestsManagerConfig)
+
+These are passed to `SignedRequestsManager` constructor and apply to all storage implementations:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `maxSessions` | 65535 | Maximum concurrent sessions |
-| `maxSessionsPerUser` | 3 | Maximum sessions per user |
 | `validitySignature` | 5000 | Signature validity window in milliseconds |
 | `validityToken` | 3600000 | Session token validity in milliseconds |
-| `tokenLength` | 32 | Token length in bytes |
+| `tokenLength` | 32 | Token length in bytes (cryptographic secret) |
+
+#### SessionsStorageLocal Specific Parameters
+
+These are specific to the in-memory implementation:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `maxSessions` | 65535 | Maximum concurrent sessions in memory |
+| `maxSessionsPerUser` | 3 | Maximum sessions per user (enforced by removing oldest) |
 
 ## Client-Side Usage
 
@@ -111,17 +146,49 @@ app.post('/api/protected', (c) => {
 <script type="module">
   import { sessionManager } from 'https://cdn.example.com/honosignedrequests/dist/client/SignedRequester.js';
   
-  // After login, store session credentials
-  sessionManager.setSession({
-    sessionId: response.sessionId,
-    token: response.token,
-    sequenceNumber: response.sequenceNumber
-  });
+  // Check if we have session data stored
+  if (sessionManager.getSession()) {
+    // Try to verify the session is still valid
+    try {
+      const pingResponse = await sessionManager.signedRequestJson('/api/ping', {});
+      
+      if (!pingResponse?.pong) {
+        // Session invalid or expired, need to login
+        await login();
+      }
+    } catch (error) {
+      // Network error or session invalid, need to login
+      await login();
+    }
+  } else {
+    // No session data, need to login
+    await login();
+  }
   
-  // Make signed requests
+  // Now we're authenticated, make protected requests
   const data = await sessionManager.signedRequestJson('/api/protected', {
     action: 'getData'
   });
+  
+  async function login() {
+    const response = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: 'user@example.com',
+        password: 'password123'
+      })
+    });
+    
+    const loginData = await response.json();
+    
+    // Store session credentials
+    sessionManager.setSession({
+      sessionId: loginData.sessionId,
+      token: loginData.token,
+      sequenceNumber: loginData.sequenceNumber
+    });
+  }
 </script>
 ```
 
@@ -204,12 +271,53 @@ The signature is computed over the following concatenated string:
 sessionId={id};sequenceNumber={seq};timestamp={ts};{sorted_params}
 ```
 
+The HMAC-SHA256 signature is computed using the session token as the secret key.
+
 Parameters are sorted alphabetically by key. Values are serialized as:
 - Primitives (string, number, boolean) and null: `String(value)`
 - Objects and arrays: `JSON.stringify(value)`
 
+## Implementing Custom Storage
+
+To implement your own session storage (e.g., Redis-based), extend the `SessionsStorage` abstract class:
+
+```typescript
+import { SessionsStorage } from '@stefanobalocco/honosignedrequests';
+import { Session } from '@stefanobalocco/honosignedrequests';
+
+class RedisSessionsStorage extends SessionsStorage {
+  async validate(
+    validitySignature: number,
+    validityToken: number,
+    sessionId: number,
+    timestamp: number,
+    parameters: [string, any][],
+    signature: Uint8Array<ArrayBuffer>
+  ): Promise<Session | undefined> {
+    // Implement validation logic with Redis
+    // Use validitySignature to check timestamp window
+    // Use validityToken to verify session hasn't expired
+  }
+
+  async create(
+    validityToken: number,
+    tokenLength: number,
+    userId: number
+  ): Promise<Session> {
+    // Implement session creation with Redis
+    // Generate token with specified tokenLength
+    // Use validityToken for Redis TTL or expiration tracking
+    // Implement your own maxSessionsPerUser logic if needed
+  }
+}
+```
+
+The generic parameters (`validitySignature`, `validityToken`, `tokenLength`) are passed by `SignedRequestsManager` to your storage implementation. Storage-specific behaviors like `maxSessionsPerUser` limits should be implemented according to your storage's characteristics (e.g., Redis TTL, database triggers, etc.).
+
 ## Security Considerations
 
+- The session **token** is the cryptographic secret used for HMAC signature computation
+- The token is randomly generated during session creation and shared only once with the client
 - The sequence number increments with each successful request, preventing replay attacks
 - Timestamps are validated within a configurable window to prevent delayed replay
 - Signatures use constant-time comparison to prevent timing attacks
