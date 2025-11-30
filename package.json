@@ -10,14 +10,14 @@
       "import": "./dist/index.js"
     },
     "./client": {
-      "types": "./dist/client/SignedRequester.d.ts",
-      "import": "./dist/client/SignedRequester.min.js"
+      "types": "./client/dist/SignedRequester.d.ts",
+      "import": "./client/dist/SignedRequester.min.js"
     }
   },
   "scripts": {
     "build": "npm run build:server && npm run build:client",
     "build:server": "tsc",
-    "build:client": "tsc -p tsconfig.client.json && terser dist/client/SignedRequester.js -o dist/client/SignedRequester.min.js --toplevel -m -c --mangle-props regex=/^_/"
+    "build:client": "tsc -p client/tsconfig.json && terser client/dist/SignedRequester.js -o client/dist/SignedRequester.min.js --toplevel -m -c --mangle-props regex=/^_/"
   },
   "devDependencies": {
     "hono": "^4.10.6",

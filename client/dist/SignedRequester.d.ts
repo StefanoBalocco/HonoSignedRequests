@@ -1,24 +1,25 @@
+type Methods = 'GET' | 'POST' | 'PUT' | 'DELETE';
 type SessionConfig = {
     sessionId: number;
     token: string;
     sequenceNumber: number;
 };
-type SignedRequest<T = Record<string, any>> = T & {
+type SignedRequest<T = Record<string, any>> = {
     sessionId: number;
     timestamp: number;
     signature: string;
-};
+} & T;
 type SignedRequestOptions = {
     baseUrl?: string;
     headers?: Record<string, string>;
-    method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    method?: Methods;
 };
 declare class SignedRequester {
     private static readonly _primitives;
+    private readonly _baseUrl;
     private _sessionId;
     private _token;
     private _sequenceNumber;
-    private _baseUrl;
     private _semaphore;
     private _semaphoreQueue;
     private _semaphoreAcquire;

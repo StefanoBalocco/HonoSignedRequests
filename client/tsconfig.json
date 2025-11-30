@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "outDir": "dist/client",
+    "outDir": "dist",
     "target": "es2020",
     "module": "esnext",
     "moduleResolution": "bundler",
@@ -19,6 +19,6 @@
     "lib": ["es2020", "dom"]
   },
   "include": [
-    "src/client/SignedRequester.ts"
+    "src/SignedRequester.ts"
   ]
 }

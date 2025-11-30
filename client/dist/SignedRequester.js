@@ -140,7 +140,7 @@ class SignedRequester {
                     ['sessionId', this._sessionId],
                     ['sequenceNumber', this._sequenceNumber],
                     ['timestamp', timestamp],
-                    ...parametersArray.sort((a, b) => a[0].localeCompare(b[0])),
+                    ...parametersArray.sort((a, b) => a[0].localeCompare(b[0]))
                 ];
                 const dataToSign = parametersOrdered
                     .map(([name, value]) => {
@@ -157,7 +157,7 @@ class SignedRequester {
                 const signedPayload = {
                     sessionId: this._sessionId,
                     timestamp: timestamp,
-                    signature: signature,
+                    signature: signature
                 };
                 Object.assign(signedPayload, Object.fromEntries(parametersArray));
                 const url = options.baseUrl
@@ -168,9 +168,9 @@ class SignedRequester {
                     method: method,
                     headers: {
                         'Content-Type': 'application/json',
-                        ...options.headers,
+                        ...options.headers
                     },
-                    body: JSON.stringify(signedPayload),
+                    body: JSON.stringify(signedPayload)
                 });
                 if (returnValue.ok) {
                     this._incrementSequenceNumber();
@@ -183,8 +183,8 @@ class SignedRequester {
                 error = new Error('Session not configured');
             }
         }
-        catch (err) {
-            error = err instanceof Error ? err : new Error(String(err));
+        catch (e) {
+            error = e instanceof Error ? e : new Error(String(e));
         }
         finally {
             this._semaphoreRelease();
@@ -206,8 +206,8 @@ class SignedRequester {
                 error = new Error(`Request failed with status ${response.status}`);
             }
         }
-        catch (err) {
-            error = err instanceof Error ? err : new Error(String(err));
+        catch (e) {
+            error = e instanceof Error ? e : new Error(String(e));
         }
         if (error) {
             throw error;
@@ -218,7 +218,7 @@ class SignedRequester {
 SignedRequester._primitives = new Set([
     'undefined',
     'string',
-    'number',
+    'number'
 ]);
 export const sessionManager = new SignedRequester();
 export { SignedRequester };
