@@ -102,10 +102,10 @@ export class SignedRequestsManager {
 			const signature: Uint8Array<ArrayBuffer> = fromBase64Url( parameters.signature );
 
 			if( sessionId && timestamp && signature ) {
-				// Rimuove sessionId, timestamp e signature dai parametri prima di validare
+				// Remove sessionId, timestamp, and signature from parameters before validation
 				const { sessionId: _, timestamp: __, signature: ___, ...other } = parameters;
 
-				// Converte in array di tuple per sessionValidate
+				// Convert to array of tuples for sessionValidate
 				const otherParameters: [ string, string ][] = Object.entries( other );
 
 				session = await this.validate(

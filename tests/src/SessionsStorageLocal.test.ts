@@ -51,7 +51,7 @@ test('SessionsStorageLocal enforces maxSessionsPerUser', async ( t ) => {
 	const userSessions = await storage.getByUserId( 1 );
 	
 	t.is( userSessions.length, 2 );
-	t.false( userSessions.some( s => s.id === session1.id ) ); // Prima sessione rimossa
+	t.false( userSessions.some( s => s.id === session1.id ) ); // First session removed
 	t.true( userSessions.some( s => s.id === session2.id ) );
 	t.true( userSessions.some( s => s.id === session3.id ) );
 } );
@@ -114,24 +114,24 @@ test('SessionsStorageLocal cleans up expired sessions', async ( t ) => {
 		maxSessions: 10
 	} );
 
-	// Crea 8 sessioni (supera il 75% di cleanup threshold)
+	// Create 8 sessions (exceeds the 75% cleanup threshold)
 	const sessions = [];
 	for( let i = 0; i < 8; i++ ) {
-		sessions.push( await storage.create( 100, 32, i ) ); // validityToken molto basso
+		sessions.push( await storage.create( 100, 32, i ) ); // Very low validityToken
 	}
 
-	// Aspetta che scadano
+	// Wait for them to expire
 	await new Promise( resolve => setTimeout( resolve, 150 ) );
 
-	// Crea una nuova sessione con lo STESSO validityToken per triggerare il cleanup correttamente
-	// (il cleanup usa il validityToken passato alla chiamata create corrente)
+	// Create a new session with the SAME validityToken to trigger cleanup correctly
+	// (cleanup uses the validityToken passed to the current create call)
 	const newSession = await storage.create( 100, 32, 99 );
 
-	// Le sessioni scadute dovrebbero essere state rimosse
-	// (escludi l'ID della nuova sessione che potrebbe aver riutilizzato un ID scaduto)
+	// Expired sessions should have been removed
+	// (exclude the new session's ID which may have reused an expired ID)
 	for( const session of sessions ) {
 		if( session.id === newSession.id ) {
-			// La nuova sessione ha riutilizzato questo ID, verifica che sia la nuova sessione
+			// The new session reused this ID, verify it's the new session
 			const retrieved = await storage.getBySessionId( session.id );
 			t.is( retrieved?.userId, 99 );
 		} else {
@@ -161,14 +161,14 @@ test('SessionsStorageLocal allows reuse of expired session IDs', async ( t ) => 
 		maxSessions: 1 // Con solo 1 slot, l'ID sarà sempre 0
 	} );
 
-	const session1 = await storage.create( 100, 32, 1 ); // validityToken molto basso
+	const session1 = await storage.create( 100, 32, 1 ); // Very low validityToken
 	t.is( session1.id, 0 );
 
-	// Aspetta che scada
+	// Wait for it to expire
 	await new Promise( resolve => setTimeout( resolve, 150 ) );
 
-	// Deve usare lo STESSO validityToken per considerare la sessione scaduta
-	// (la logica di selezione ID usa il validityToken passato alla chiamata corrente)
+	// Must use the SAME validityToken to consider the session expired
+	// (ID selection logic uses the validityToken passed to the current call)
 	const session2 = await storage.create( 100, 32, 2 );
 	t.is( session2.id, 0 );
 } );
@@ -178,15 +178,15 @@ test('SessionsStorageLocal allows creating session after expiration without erro
 		maxSessions: 3
 	} );
 
-	// Riempi tutti gli slot
+	// Fill all slots
 	await storage.create( 100, 32, 1 );
 	await storage.create( 100, 32, 2 );
 	await storage.create( 100, 32, 3 );
 
-	// Aspetta che scadano
+	// Wait for them to expire
 	await new Promise( resolve => setTimeout( resolve, 150 ) );
 
-	// Dovrebbe poter creare una nuova sessione senza errore
-	// perché gli ID scaduti sono nuovamente disponibili (con lo stesso validityToken)
+	// Should be able to create a new session without error
+	// because expired IDs are available again (with the same validityToken)
 	await t.notThrowsAsync( async () => storage.create( 100, 32, 4 ) );
 } );

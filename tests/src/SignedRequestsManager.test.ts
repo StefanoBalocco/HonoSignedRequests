@@ -5,7 +5,7 @@ import { SessionsStorageLocal } from '../../dist/SessionsStorageLocal.js';
 import { hmacSha256 } from '../../dist/Common.js';
 import { Session } from '../../dist/Session.js';
 
-// Helper per creare un'app Hono tipizzata
+// Helper to create a typed Hono app
 type Env = {
 	Variables: {
 		session?: Session;
@@ -24,7 +24,7 @@ function base64urlEncode( value: Uint8Array ): string {
 		.replace( /=+$/g, '' );
 }
 
-// Helper per creare storage e manager con configurazione standard
+// Helper to create storage and manager with standard configuration
 function createStorageAndManager( config?: Partial<{
 	validitySignature: number;
 	validityToken: number;
@@ -35,7 +35,7 @@ function createStorageAndManager( config?: Partial<{
 	return { storage, manager };
 }
 
-// Helper per creare app con autenticazione
+// Helper to create app with authentication
 function createAuthenticatedApp(
 	manager: SignedRequestsManager,
 	options: {
@@ -46,12 +46,12 @@ function createAuthenticatedApp(
 	const app = createHonoApp();
 	const { loginEndpoint = '/auth/login', protectedPaths = '/api/*' } = options;
 
-	// Login endpoint (non protetto)
+	// Login endpoint (unprotected)
 	app.post( loginEndpoint, async ( c ) => {
 		const body = await c.req.json().catch( () => ( {} ) );
 		const { username, password } = body;
 
-		// Mock authentication per test
+		// Mock authentication for tests
 		if( username === 'test' && password === 'password' ) {
 			const session = await manager.createSession( 1 );
 			const tokenBase64 = base64urlEncode( session.token );
@@ -66,7 +66,7 @@ function createAuthenticatedApp(
 		return c.json( { error: 'Invalid credentials' }, 401 );
 	} );
 
-	// Middleware per path protetti
+	// Middleware for protected paths
 	app.use( protectedPaths, manager.middleware );
 
 	return app;
@@ -126,7 +126,7 @@ test('SignedRequestsManager rejects invalid signature', async ( t ) => {
 	const session = await manager.createSession( 1 );
 	const timestamp = Date.now();
 	const parameters: [ string, any ][] = [ [ 'action', 'test' ] ];
-	const wrongSignature = new Uint8Array( 32 ); // Firma sbagliata
+	const wrongSignature = new Uint8Array( 32 ); // Wrong signature
 	
 	const validatedSession = await manager.validate(
 		session.id,
@@ -232,7 +232,7 @@ test('SignedRequestsManager deletes expired session during validation', async ( 
 
 	t.is( validatedSession, undefined );
 
-	// Verifica che la sessione sia stata cancellata
+	// Verify that the session was deleted
 	const retrieved = await storage.getBySessionId( session.id );
 	t.is( retrieved, undefined );
 } );
@@ -298,7 +298,7 @@ test('SignedRequestsManager middleware rejects invalid signature', async ( t ) =
 	const session = await manager.createSession( 1 );
 	const timestamp = Date.now();
 	
-	// Usa una signature base64url valida ma con contenuto sbagliato
+	// Use a valid base64url signature but with wrong content
 	const wrongSignature = base64urlEncode( new Uint8Array( 32 ) );
 
 	const res = await app.request( '/api/test', {
@@ -336,7 +336,7 @@ import { serve } from '@hono/node-server';
 import { SignedRequester } from '../../client/dist/SignedRequester.js';
 import type { AddressInfo } from 'node:net';
 
-// Mock localStorage per Node.js (necessario per il client)
+// Mock localStorage for Node.js (required for the client)
 class LocalStorageMock {
 	private store: Map<string, string> = new Map();
 
@@ -360,16 +360,16 @@ class LocalStorageMock {
 const localStorageMock = new LocalStorageMock();
 ( global as any ).localStorage = localStorageMock;
 
-// Helper per ottenere una porta disponibile
+// Helper to get an available port
 function getAvailablePort(): number {
-	// Usa porte random tra 3000 e 4000 per evitare conflitti
+	// Use random ports between 3000 and 4000 to avoid conflicts
 	return 3000 + Math.floor( Math.random() * 1000 );
 }
 
 test.serial('Integration: Client can authenticate and make signed requests', async ( t ) => {
 	localStorageMock.clear();
 
-	// Setup server con helper
+	// Setup server with helper
 	const { manager } = createStorageAndManager();
 	const app = createAuthenticatedApp( manager );
 
@@ -387,7 +387,7 @@ test.serial('Integration: Client can authenticate and make signed requests', asy
 		return c.json( { message: 'Success', userId: session.userId } );
 	} );
 
-	// Avvia server su porta random
+	// Start server on random port
 	const port = getAvailablePort();
 	const server = serve( { fetch: app.fetch, port } );
 	const actualPort = ( server.address() as AddressInfo ).port;
@@ -415,14 +415,14 @@ test.serial('Integration: Client can authenticate and make signed requests', asy
 		t.truthy( loginData.token );
 		t.is( loginData.sequenceNumber, 1 );
 
-		// Configura sessione nel client
+		// Configure session in the client
 		client.setSession( {
 			sessionId: loginData.sessionId,
 			token: loginData.token,
 			sequenceNumber: loginData.sequenceNumber
 		} );
 
-		// Test ping con signed request
+		// Test ping with signed request
 		const pingResponse = await client.signedRequestJson<{ pong: boolean }>( '/api/ping', {} );
 		t.true( pingResponse.pong );
 
@@ -435,10 +435,10 @@ test.serial('Integration: Client can authenticate and make signed requests', asy
 		t.is( protectedResponse.message, 'Success' );
 		t.is( protectedResponse.userId, 1 );
 
-		// Verifica che la sequenza sia incrementata
+		// Verify that the sequence has been incremented
 		t.is( localStorageMock.getItem( 'sequenceNumber' ), '3' );
 	} finally {
-		// Chiudi server
+		// Close server
 		server.close();
 	}
 } );
@@ -446,7 +446,7 @@ test.serial('Integration: Client can authenticate and make signed requests', asy
 test.serial('Integration: Client handles multiple sequential requests correctly', async ( t ) => {
 	localStorageMock.clear();
 
-	// Setup server con helper
+	// Setup server with helper
 	const { manager } = createStorageAndManager();
 	const app = createAuthenticatedApp( manager );
 
@@ -478,17 +478,17 @@ test.serial('Integration: Client handles multiple sequential requests correctly'
 
 		client.setSession( loginData );
 
-		// Fai 5 richieste sequenziali
+		// Make 5 sequential requests
 		for( let i = 0; i < 5; i++ ) {
 			const response = await client.signedRequestJson<{ count: number }>(
 				'/api/counter',
 				{}
 			);
-			// Il server vede sequenceNumber dopo l'incremento
+			// The server sees sequenceNumber after the increment
 			t.is( response.count, i + 2 );
 		}
 
-		// Verifica che sequenceNumber sia stato incrementato correttamente
+		// Verify that sequenceNumber was incremented correctly
 		t.is( localStorageMock.getItem( 'sequenceNumber' ), '6' );
 	} finally {
 		server.close();
@@ -498,7 +498,7 @@ test.serial('Integration: Client handles multiple sequential requests correctly'
 test.serial('Integration: Client clears session on 401 response', async ( t ) => {
 	localStorageMock.clear();
 
-	// Setup server con helper
+	// Setup server with helper
 	const { storage, manager } = createStorageAndManager();
 	const app = createAuthenticatedApp( manager );
 
@@ -533,7 +533,7 @@ test.serial('Integration: Client clears session on 401 response', async ( t ) =>
 
 		client.setSession( loginData );
 
-		// Prima richiesta: OK
+		// First request: OK
 		const response1 = await client.signedRequestJson<{ ok: boolean }>(
 			'/api/test',
 			{}
@@ -541,14 +541,14 @@ test.serial('Integration: Client clears session on 401 response', async ( t ) =>
 		t.true( response1.ok );
 		t.true( client.getSession() );
 
-		// Elimina la sessione sul server
+		// Delete the session on the server
 		await storage.delete( loginData.sessionId );
 
-		// Seconda richiesta: dovrebbe ricevere 401 e clearSession
+		// Second request: should receive 401 and clearSession
 		const response2 = await client.signedRequest( '/api/test', {} );
 		t.is( response2.status, 401 );
 
-		// Verifica che la sessione sia stata cancellata
+		// Verify that the session was cleared
 		t.false( client.getSession() );
 		t.is( localStorageMock.getItem( 'sessionId' ), null );
 	} finally {
@@ -559,7 +559,7 @@ test.serial('Integration: Client clears session on 401 response', async ( t ) =>
 test.serial('Integration: Server rejects requests with wrong signature', async ( t ) => {
 	localStorageMock.clear();
 
-	// Setup server con helper
+	// Setup server with helper
 	const { manager } = createStorageAndManager();
 	const app = createAuthenticatedApp( manager );
 
@@ -589,7 +589,7 @@ test.serial('Integration: Server rejects requests with wrong signature', async (
 			sequenceNumber: number;
 		};
 
-		// Configura sessione con token sbagliato
+		// Configure session with wrong token
 		const wrongToken = base64urlEncode( new Uint8Array( 32 ) );
 		client.setSession( {
 			sessionId: loginData.sessionId,
@@ -597,7 +597,7 @@ test.serial('Integration: Server rejects requests with wrong signature', async (
 			sequenceNumber: loginData.sequenceNumber
 		} );
 
-		// La richiesta dovrebbe fallire perché la firma è sbagliata
+		// The request should fail because the signature is wrong
 		const response = await client.signedRequestJson<{ authenticated: boolean }>(
 			'/api/test',
 			{}
@@ -612,7 +612,7 @@ test.serial('Integration: Server rejects requests with wrong signature', async (
 test.serial('Integration: Server rejects expired signatures', async ( t ) => {
 	localStorageMock.clear();
 
-	// Setup server con validità firma molto breve
+	// Setup server with very short signature validity
 	const { storage, manager } = createStorageAndManager( {
 		validitySignature: 100 // 100ms
 	} );
@@ -645,8 +645,8 @@ test.serial('Integration: Server rejects expired signatures', async ( t ) => {
 		const session = await storage.getBySessionId( loginData.sessionId );
 		t.truthy( session );
 
-		// Crea una firma manualmente con timestamp vecchio
-		const oldTimestamp = Date.now() - 200; // 200ms fa
+		// Create a signature manually with old timestamp
+		const oldTimestamp = Date.now() - 200; // 200ms ago
 		const parameters = [ [ 'action', 'test' ] ];
 		const parametersOrdered = [
 			[ 'sessionId', session!.id ],
@@ -660,7 +660,7 @@ test.serial('Integration: Server rejects expired signatures', async ( t ) => {
 		const signatureBytes = await hmacSha256( session!.token, dataToSign );
 		const signature = base64urlEncode( signatureBytes );
 
-		// Fai richiesta con firma scaduta
+		// Make request with expired signature
 		const response = await fetch( `${ baseUrl }/api/test`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
