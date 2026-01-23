@@ -128,6 +128,7 @@ These are passed to `SignedRequestsManager` constructor and apply to all storage
 | `validitySignature` | 5000 | Signature validity window in milliseconds |
 | `validityToken` | 3600000 | Session token validity in milliseconds |
 | `tokenLength` | 32 | Token length in bytes (cryptographic secret) |
+| `onError` | undefined | Callback invoked when an error occurs during request validation |
 
 #### SessionsStorageLocal Specific Parameters
 
@@ -147,8 +148,10 @@ These are specific to the in-memory implementation:
   import { SignedRequester } from 'https://cdn.jsdelivr.net/gh/StefanoBalocco/HonoSignedRequests/client/dist/SignedRequester.min.js';
   
   const requester = new SignedRequester();
-  // You can also specify a base URL for request
+  // You can also specify a base URL for requests
   //const requester = new SignedRequester('https://api.example.com');
+  // You can also specify an error handler for encoding/decoding errors
+  //const requester = new SignedRequester('https://api.example.com', (error) => console.error(error));
   
   // Check if we have session data stored
   let needLogin = true;
@@ -193,6 +196,17 @@ These are specific to the in-memory implementation:
 ```
 
 ### Client API
+
+#### Constructor
+
+```javascript
+const requester = new SignedRequester(baseUrl?, onError?);
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `baseUrl` | `string` | Optional base URL for all requests. If not provided, relative paths are used. |
+| `onError` | `(error: unknown) => void` | Optional callback invoked when encoding/decoding errors occur. |
 
 #### `setSession(config)`
 
