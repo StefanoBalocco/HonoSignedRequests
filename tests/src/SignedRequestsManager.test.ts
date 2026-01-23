@@ -200,15 +200,16 @@ test('SignedRequestsManager rejects future timestamp', async ( t ) => {
 
 test('SignedRequestsManager deletes expired session during validation', async ( t ) => {
 	const storage = new SessionsStorageLocal();
+	const validityToken = 100; // 100ms
 	const manager = new SignedRequestsManager( storage, {
-		validityToken: 100 // 100ms
+		validityToken
 	} );
-	
+
 	const session = await manager.createSession( 1 );
-	
-	// Aspetta che la sessione scada
-	await new Promise( resolve => setTimeout( resolve, 150 ) );
-	
+
+	// Simula che la sessione sia scaduta modificando lastUsed
+	session.lastUsed = Date.now() - validityToken - 50;
+
 	const timestamp = Date.now();
 	const parameters: [ string, any ][] = [];
 	const parametersOrdered = [
@@ -221,16 +222,16 @@ test('SignedRequestsManager deletes expired session during validation', async ( 
 		.map( ( [ name, value ] ) => `${ name }=${ String( value ) }` )
 		.join( ';' );
 	const signature = await hmacSha256( session.token, dataToSign );
-	
+
 	const validatedSession = await manager.validate(
 		session.id,
 		timestamp,
 		parameters,
 		signature
 	);
-	
+
 	t.is( validatedSession, undefined );
-	
+
 	// Verifica che la sessione sia stata cancellata
 	const retrieved = await storage.getBySessionId( session.id );
 	t.is( retrieved, undefined );

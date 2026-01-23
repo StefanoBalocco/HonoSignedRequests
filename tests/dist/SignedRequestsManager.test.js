@@ -123,11 +123,12 @@ test('SignedRequestsManager rejects future timestamp', async (t) => {
 });
 test('SignedRequestsManager deletes expired session during validation', async (t) => {
     const storage = new SessionsStorageLocal();
+    const validityToken = 100;
     const manager = new SignedRequestsManager(storage, {
-        validityToken: 100
+        validityToken
     });
     const session = await manager.createSession(1);
-    await new Promise(resolve => setTimeout(resolve, 150));
+    session.lastUsed = Date.now() - validityToken - 50;
     const timestamp = Date.now();
     const parameters = [];
     const parametersOrdered = [
