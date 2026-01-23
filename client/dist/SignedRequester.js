@@ -1,4 +1,4 @@
-function _base64url_encode(value) {
+function _base64url_encode(value, onError) {
     let returnValue = '';
     if (0 < value?.length) {
         try {
@@ -9,13 +9,12 @@ function _base64url_encode(value) {
                 .replace(/=+$/, '');
         }
         catch (error) {
+            onError?.(error);
         }
-    }
-    else {
     }
     return returnValue;
 }
-function _base64url_decode(value) {
+function _base64url_decode(value, onError) {
     let returnValue;
     if (0 < value?.length && /^[A-Za-z0-9_-]*$/.test(value)) {
         const padding = value.length % 4;
@@ -26,9 +25,8 @@ function _base64url_decode(value) {
             returnValue = Uint8Array.from(binaryString, (char) => char.charCodeAt(0));
         }
         catch (error) {
+            onError?.(error);
         }
-    }
-    else {
     }
     return returnValue;
 }
@@ -73,7 +71,7 @@ class SignedRequester {
         if (sessionIdStr && tokenStr && sequenceNumberStr) {
             const sessionId = parseInt(sessionIdStr);
             const sequenceNumber = parseInt(sequenceNumberStr);
-            const token = _base64url_decode(tokenStr);
+            const token = _base64url_decode(tokenStr, this._onError);
             if (!isNaN(sessionId) && !isNaN(sequenceNumber) && token) {
                 this._sessionId = sessionId;
                 this._token = token;
@@ -83,13 +81,14 @@ class SignedRequester {
         }
         return returnValue;
     }
-    constructor(baseUrl) {
+    constructor(baseUrl, onError) {
         this._semaphore = false;
         this._semaphoreQueue = [];
         this._baseUrl = baseUrl;
+        this._onError = onError;
     }
     setSession(config) {
-        const token = _base64url_decode(config.token);
+        const token = _base64url_decode(config.token, this._onError);
         if (token) {
             this._sessionId = config.sessionId;
             this._token = token;
@@ -149,7 +148,7 @@ class SignedRequester {
                 const cryptoKey = await crypto.subtle.importKey('raw', this._token, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
                 const encoder = new TextEncoder();
                 const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(dataToSign));
-                const signature = _base64url_encode(new Uint8Array(signatureBuffer));
+                const signature = _base64url_encode(new Uint8Array(signatureBuffer), this._onError);
                 const signedPayload = {
                     sessionId: this._sessionId,
                     timestamp: timestamp,

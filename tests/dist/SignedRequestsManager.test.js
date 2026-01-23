@@ -1,44 +1,12 @@
 import test from 'ava';
-import { Hono } from 'hono';
+import { serve } from '@hono/node-server';
 import { SignedRequestsManager } from '../../dist/SignedRequestsManager.js';
 import { SessionsStorageLocal } from '../../dist/SessionsStorageLocal.js';
-import { hmacSha256 } from '../../dist/Common.js';
-function createHonoApp() {
-    return new Hono();
-}
-function base64urlEncode(value) {
-    const base64String = Array.from(value, (byte) => String.fromCharCode(byte)).join('');
-    return btoa(base64String)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/g, '');
-}
-function createStorageAndManager(config) {
-    const storage = new SessionsStorageLocal();
-    const manager = new SignedRequestsManager(storage, config);
-    return { storage, manager };
-}
-function createAuthenticatedApp(manager, options = {}) {
-    const app = createHonoApp();
-    const { loginEndpoint = '/auth/login', protectedPaths = '/api/*' } = options;
-    app.post(loginEndpoint, async (c) => {
-        const body = await c.req.json().catch(() => ({}));
-        const { username, password } = body;
-        if (username === 'test' && password === 'password') {
-            const session = await manager.createSession(1);
-            const tokenBase64 = base64urlEncode(session.token);
-            return c.json({
-                sessionId: session.id,
-                token: tokenBase64,
-                sequenceNumber: session.sequenceNumber
-            });
-        }
-        return c.json({ error: 'Invalid credentials' }, 401);
-    });
-    app.use(protectedPaths, manager.middleware);
-    return app;
-}
-test('SignedRequestsManager creates session', async (t) => {
+import { SignedRequester } from '../../client/dist/SignedRequester.js';
+import { LocalStorageMock, base64urlEncode, createSignature, createStorageAndManager, createMiddlewareApp, createAuthenticatedApp, getAvailablePort } from './TestHelpers.js';
+const localStorageMock = new LocalStorageMock();
+global.localStorage = localStorageMock;
+test('SignedRequestsManager: Creates session', async (t) => {
     const storage = new SessionsStorageLocal();
     const manager = new SignedRequestsManager(storage, {
         validitySignature: 5000,
@@ -50,30 +18,19 @@ test('SignedRequestsManager creates session', async (t) => {
     t.is(session.sequenceNumber, 1);
     t.is(session.token.length, 32);
 });
-test('SignedRequestsManager validates correct signature', async (t) => {
-    const storage = new SessionsStorageLocal();
-    const manager = new SignedRequestsManager(storage);
+test('SignedRequestsManager: Validates correct signature', async (t) => {
+    const { manager } = createStorageAndManager();
     const session = await manager.createSession(1);
     const timestamp = Date.now();
     const parameters = [['action', 'test']];
-    const parametersOrdered = [
-        ['sessionId', session.id],
-        ['sequenceNumber', session.sequenceNumber],
-        ['timestamp', timestamp],
-        ...parameters
-    ];
-    const dataToSign = parametersOrdered
-        .map(([name, value]) => `${name}=${String(value)}`)
-        .join(';');
-    const signature = await hmacSha256(session.token, dataToSign);
+    const { signature } = await createSignature(session, timestamp, parameters);
     const validatedSession = await manager.validate(session.id, timestamp, parameters, signature);
     t.truthy(validatedSession);
     t.is(validatedSession.id, session.id);
     t.is(validatedSession.sequenceNumber, 2);
 });
-test('SignedRequestsManager rejects invalid signature', async (t) => {
-    const storage = new SessionsStorageLocal();
-    const manager = new SignedRequestsManager(storage);
+test('SignedRequestsManager: Rejects invalid signature', async (t) => {
+    const { manager } = createStorageAndManager();
     const session = await manager.createSession(1);
     const timestamp = Date.now();
     const parameters = [['action', 'test']];
@@ -81,104 +38,62 @@ test('SignedRequestsManager rejects invalid signature', async (t) => {
     const validatedSession = await manager.validate(session.id, timestamp, parameters, wrongSignature);
     t.is(validatedSession, undefined);
 });
-test('SignedRequestsManager rejects expired timestamp', async (t) => {
-    const storage = new SessionsStorageLocal();
-    const manager = new SignedRequestsManager(storage, {
-        validitySignature: 1000
-    });
+test('SignedRequestsManager: Rejects expired timestamp', async (t) => {
+    const { manager } = createStorageAndManager({ validitySignature: 1000 });
     const session = await manager.createSession(1);
     const oldTimestamp = Date.now() - 2000;
     const parameters = [];
-    const parametersOrdered = [
-        ['sessionId', session.id],
-        ['sequenceNumber', session.sequenceNumber],
-        ['timestamp', oldTimestamp],
-        ...parameters
-    ];
-    const dataToSign = parametersOrdered
-        .map(([name, value]) => `${name}=${String(value)}`)
-        .join(';');
-    const signature = await hmacSha256(session.token, dataToSign);
+    const { signature } = await createSignature(session, oldTimestamp, parameters);
     const validatedSession = await manager.validate(session.id, oldTimestamp, parameters, signature);
     t.is(validatedSession, undefined);
 });
-test('SignedRequestsManager rejects future timestamp', async (t) => {
-    const storage = new SessionsStorageLocal();
-    const manager = new SignedRequestsManager(storage);
+test('SignedRequestsManager: Rejects future timestamp', async (t) => {
+    const { manager } = createStorageAndManager();
     const session = await manager.createSession(1);
     const futureTimestamp = Date.now() + 10000;
     const parameters = [];
-    const parametersOrdered = [
-        ['sessionId', session.id],
-        ['sequenceNumber', session.sequenceNumber],
-        ['timestamp', futureTimestamp],
-        ...parameters
-    ];
-    const dataToSign = parametersOrdered
-        .map(([name, value]) => `${name}=${String(value)}`)
-        .join(';');
-    const signature = await hmacSha256(session.token, dataToSign);
+    const { signature } = await createSignature(session, futureTimestamp, parameters);
     const validatedSession = await manager.validate(session.id, futureTimestamp, parameters, signature);
     t.is(validatedSession, undefined);
 });
-test('SignedRequestsManager deletes expired session during validation', async (t) => {
-    const storage = new SessionsStorageLocal();
+test('SignedRequestsManager: Deletes expired session during validation', async (t) => {
     const validityToken = 100;
-    const manager = new SignedRequestsManager(storage, {
-        validityToken
-    });
+    const { storage, manager } = createStorageAndManager({ validityToken });
     const session = await manager.createSession(1);
     session.lastUsed = Date.now() - validityToken - 50;
     const timestamp = Date.now();
     const parameters = [];
-    const parametersOrdered = [
-        ['sessionId', session.id],
-        ['sequenceNumber', session.sequenceNumber],
-        ['timestamp', timestamp],
-        ...parameters
-    ];
-    const dataToSign = parametersOrdered
-        .map(([name, value]) => `${name}=${String(value)}`)
-        .join(';');
-    const signature = await hmacSha256(session.token, dataToSign);
+    const { signature } = await createSignature(session, timestamp, parameters);
     const validatedSession = await manager.validate(session.id, timestamp, parameters, signature);
     t.is(validatedSession, undefined);
     const retrieved = await storage.getBySessionId(session.id);
     t.is(retrieved, undefined);
 });
-test('SignedRequestsManager middleware validates POST request', async (t) => {
-    const app = createHonoApp();
-    const storage = new SessionsStorageLocal();
-    const manager = new SignedRequestsManager(storage);
-    app.use('/api/*', manager.middleware);
+test('SignedRequestsManager: Uses default storage if none provided', async (t) => {
+    const manager = new SignedRequestsManager();
+    const session = await manager.createSession(1);
+    t.truthy(session);
+    t.is(session.userId, 1);
+});
+test('Middleware: Validates POST request with JSON', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
     app.post('/api/test', (c) => {
         const session = c.get('session');
         return c.json({ authenticated: !!session, userId: session?.userId });
     });
     const session = await manager.createSession(1);
     const timestamp = Date.now();
-    const parameters = { action: 'test' };
-    const parametersOrdered = [
-        ['sessionId', session.id],
-        ['sequenceNumber', session.sequenceNumber],
-        ['timestamp', timestamp],
-        ['action', 'test']
-    ];
-    const dataToSign = parametersOrdered
-        .map(([name, value]) => `${name}=${String(value)}`)
-        .join(';');
-    const signatureBytes = await hmacSha256(session.token, dataToSign);
-    const signature = base64urlEncode(signatureBytes);
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
     const res = await app.request('/api/test', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             sessionId: session.id,
             timestamp,
-            signature,
-            ...parameters
+            signature: signatureBase64,
+            action: 'test'
         })
     });
     const json = await res.json();
@@ -186,11 +101,61 @@ test('SignedRequestsManager middleware validates POST request', async (t) => {
     t.true(json.authenticated);
     t.is(json.userId, 1);
 });
-test('SignedRequestsManager middleware rejects invalid signature', async (t) => {
-    const app = createHonoApp();
-    const storage = new SessionsStorageLocal();
-    const manager = new SignedRequestsManager(storage);
-    app.use('/api/*', manager.middleware);
+test('Middleware: Validates GET request', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.get('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session, userId: session?.userId });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const queryParams = new URLSearchParams({
+        sessionId: String(session.id),
+        timestamp: String(timestamp),
+        signature: signatureBase64,
+        action: 'test'
+    });
+    const res = await app.request(`/api/test?${queryParams.toString()}`, {
+        method: 'GET'
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.true(json.authenticated);
+    t.is(json.userId, 1);
+});
+test('Middleware: Validates POST request with form data', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.post('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session, userId: session?.userId });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const formData = new URLSearchParams({
+        sessionId: String(session.id),
+        timestamp: String(timestamp),
+        signature: signatureBase64,
+        action: 'test'
+    });
+    const res = await app.request('/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.true(json.authenticated);
+    t.is(json.userId, 1);
+});
+test('Middleware: Rejects invalid signature', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
     app.post('/api/test', (c) => {
         const session = c.get('session');
         return c.json({ authenticated: !!session });
@@ -200,9 +165,7 @@ test('SignedRequestsManager middleware rejects invalid signature', async (t) => 
     const wrongSignature = base64urlEncode(new Uint8Array(32));
     const res = await app.request('/api/test', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             sessionId: session.id,
             timestamp,
@@ -213,34 +176,50 @@ test('SignedRequestsManager middleware rejects invalid signature', async (t) => 
     t.is(res.status, 200);
     t.false(json.authenticated);
 });
-test('SignedRequestsManager uses default storage if none provided', async (t) => {
-    const manager = new SignedRequestsManager();
+test('Middleware: Handles malformed signature gracefully', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.post('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session });
+    });
     const session = await manager.createSession(1);
-    t.truthy(session);
-    t.is(session.userId, 1);
+    const res = await app.request('/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: session.id,
+            timestamp: Date.now(),
+            signature: '!!!invalid-base64!!!'
+        })
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.false(json.authenticated);
 });
-import { serve } from '@hono/node-server';
-import { SignedRequester } from '../../client/dist/SignedRequester.js';
-class LocalStorageMock {
-    store = new Map();
-    getItem(key) {
-        return this.store.get(key) || null;
-    }
-    setItem(key, value) {
-        this.store.set(key, value);
-    }
-    removeItem(key) {
-        this.store.delete(key);
-    }
-    clear() {
-        this.store.clear();
-    }
-}
-const localStorageMock = new LocalStorageMock();
-global.localStorage = localStorageMock;
-function getAvailablePort() {
-    return 3000 + Math.floor(Math.random() * 1000);
-}
+test('Middleware: Calls onError callback when validation fails', async (t) => {
+    const errors = [];
+    const { manager } = createStorageAndManager({
+        onError: (error) => errors.push(error)
+    });
+    const app = createMiddlewareApp(manager);
+    app.post('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session });
+    });
+    const session = await manager.createSession(1);
+    await app.request('/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: session.id,
+            timestamp: Date.now(),
+            signature: '!!!invalid-base64!!!'
+        })
+    });
+    t.is(errors.length, 1);
+    t.true(errors[0] instanceof Error);
+});
 test.serial('Integration: Client can authenticate and make signed requests', async (t) => {
     localStorageMock.clear();
     const { manager } = createStorageAndManager();
@@ -272,11 +251,7 @@ test.serial('Integration: Client can authenticate and make signed requests', asy
         t.truthy(loginData.sessionId);
         t.truthy(loginData.token);
         t.is(loginData.sequenceNumber, 1);
-        client.setSession({
-            sessionId: loginData.sessionId,
-            token: loginData.token,
-            sequenceNumber: loginData.sequenceNumber
-        });
+        client.setSession(loginData);
         const pingResponse = await client.signedRequestJson('/api/ping', {});
         t.true(pingResponse.pong);
         const protectedResponse = await client.signedRequestJson('/api/protected', {});
@@ -391,9 +366,7 @@ test.serial('Integration: Server rejects requests with wrong signature', async (
 });
 test.serial('Integration: Server rejects expired signatures', async (t) => {
     localStorageMock.clear();
-    const { storage, manager } = createStorageAndManager({
-        validitySignature: 100
-    });
+    const { storage, manager } = createStorageAndManager({ validitySignature: 100 });
     const app = createAuthenticatedApp(manager);
     app.post('/api/test', (c) => {
         const session = c.get('session');
@@ -414,24 +387,14 @@ test.serial('Integration: Server rejects expired signatures', async (t) => {
         t.truthy(session);
         const oldTimestamp = Date.now() - 200;
         const parameters = [['action', 'test']];
-        const parametersOrdered = [
-            ['sessionId', session.id],
-            ['sequenceNumber', session.sequenceNumber],
-            ['timestamp', oldTimestamp],
-            ...parameters
-        ];
-        const dataToSign = parametersOrdered
-            .map(([name, value]) => `${name}=${String(value)}`)
-            .join(';');
-        const signatureBytes = await hmacSha256(session.token, dataToSign);
-        const signature = base64urlEncode(signatureBytes);
+        const { signatureBase64 } = await createSignature(session, oldTimestamp, parameters);
         const response = await fetch(`${baseUrl}/api/test`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 sessionId: loginData.sessionId,
                 timestamp: oldTimestamp,
-                signature: signature,
+                signature: signatureBase64,
                 action: 'test'
             })
         });

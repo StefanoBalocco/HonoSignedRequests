@@ -6,10 +6,12 @@ export class SignedRequestsManager {
     _validitySignature;
     _validityToken;
     _tokenLength;
+    _onError;
     constructor(storage, options) {
         this._validitySignature = options?.validitySignature ?? 5000;
         this._validityToken = options?.validityToken ?? 60 * 60000;
         this._tokenLength = options?.tokenLength ?? 32;
+        this._onError = options?.onError;
         if (!storage) {
             storage = new SessionsStorageLocal();
         }
@@ -81,7 +83,7 @@ export class SignedRequestsManager {
             }
         }
         catch (error) {
-            console.error('Session validation error:', error);
+            this._onError?.(error);
         }
         if (session) {
             context.set('session', session);

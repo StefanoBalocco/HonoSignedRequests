@@ -17,6 +17,7 @@ type SignedRequestOptions = {
 declare class SignedRequester {
     private static readonly _primitives;
     private readonly _baseUrl;
+    private readonly _onError?;
     private _sessionId;
     private _token;
     private _sequenceNumber;
@@ -26,7 +27,7 @@ declare class SignedRequester {
     private _semaphoreRelease;
     private _incrementSequenceNumber;
     private _loadFromStorage;
-    constructor(baseUrl?: string);
+    constructor(baseUrl?: string, onError?: (error: unknown) => void);
     setSession(config: SessionConfig): void;
     getSession(): boolean;
     clearSession(): void;

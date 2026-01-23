@@ -8,6 +8,7 @@ type SignedRequestsManagerConfig = {
 	validitySignature: number;
 	validityToken: number;
 	tokenLength: number;
+	onError?: ( error: unknown ) => void;
 };
 
 export class SignedRequestsManager {
@@ -16,11 +17,13 @@ export class SignedRequestsManager {
 	private readonly _validitySignature: number;
 	private readonly _validityToken: number;
 	private readonly _tokenLength: number;
+	private readonly _onError?: ( error: unknown ) => void;
 
 	constructor( storage?: SessionsStorage, options?: Partial<SignedRequestsManagerConfig> ) {
 		this._validitySignature = options?.validitySignature ?? 5000;
 		this._validityToken = options?.validityToken ?? 60 * 60000;
 		this._tokenLength = options?.tokenLength ?? 32;
+		this._onError = options?.onError;
 
 		if( !storage ) {
 			storage = new SessionsStorageLocal();
@@ -116,7 +119,7 @@ export class SignedRequestsManager {
 				);
 			}
 		} catch( error ) {
-			console.error( 'Session validation error:', error );
+			this._onError?.( error );
 		}
 
 		if( session ) {

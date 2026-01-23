@@ -29,7 +29,7 @@ type SignedRequestOptions = {
 // Base64URL utilities
 // ============================================================================
 
-function _base64url_encode( value: Uint8Array ): string {
+function _base64url_encode( value: Uint8Array, onError?: ( error: unknown ) => void ): string {
 	let returnValue: string = '';
 	if( 0 < value?.length ) {
 		try {
@@ -39,15 +39,13 @@ function _base64url_encode( value: Uint8Array ): string {
 				.replace( /\//g, '_' )
 				.replace( /=+$/, '' );
 		} catch( error ) {
-			// console.error( `base64url_encode: failed to encode (${ error })` );
+			onError?.( error );
 		}
-	} else {
-		// console.warn( 'base64url_encode: empty value' );
 	}
 	return returnValue;
 }
 
-function _base64url_decode( value: string ): Undefinedable<Uint8Array<ArrayBuffer>> {
+function _base64url_decode( value: string, onError?: ( error: unknown ) => void ): Undefinedable<Uint8Array<ArrayBuffer>> {
 	let returnValue: Undefinedable<Uint8Array<ArrayBuffer>>;
 	if( 0 < value?.length && /^[A-Za-z0-9_-]*$/.test( value ) ) {
 		const padding = value.length % 4;
@@ -62,10 +60,8 @@ function _base64url_decode( value: string ): Undefinedable<Uint8Array<ArrayBuffe
 				char.charCodeAt( 0 )
 			);
 		} catch( error ) {
-			// console.error( `base64url_decode: failed to decode (${ error })` );
+			onError?.( error );
 		}
-	} else {
-		// console.warn( 'base64url_decode: empty or invalid characters' );
 	}
 	return returnValue;
 }
@@ -82,6 +78,7 @@ class SignedRequester {
 	] );
 
 	private readonly _baseUrl: Undefinedable<string>;
+	private readonly _onError?: ( error: unknown ) => void;
 	private _sessionId: Undefinedable<number>;
 	private _token: Undefinedable<Uint8Array<ArrayBuffer>>;
 	private _sequenceNumber: Undefinedable<number>;
@@ -142,7 +139,7 @@ class SignedRequester {
 		if( sessionIdStr && tokenStr && sequenceNumberStr ) {
 			const sessionId: number = parseInt( sessionIdStr );
 			const sequenceNumber: number = parseInt( sequenceNumberStr );
-			const token: Undefinedable<Uint8Array<ArrayBuffer>> = _base64url_decode( tokenStr );
+			const token: Undefinedable<Uint8Array<ArrayBuffer>> = _base64url_decode( tokenStr, this._onError );
 
 			if( !isNaN( sessionId ) && !isNaN( sequenceNumber ) && token ) {
 				this._sessionId = sessionId;
@@ -155,18 +152,20 @@ class SignedRequester {
 	}
 
 	/**
-	 * Initialize the session manager with optional base URL
+	 * Initialize the session manager with optional base URL and error handler
 	 * If baseUrl is not provided, fetch will use relative paths (current host)
+	 * If onError is provided, it will be called when encoding/decoding errors occur
 	 */
-	constructor( baseUrl?: string ) {
+	constructor( baseUrl?: string, onError?: ( error: unknown ) => void ) {
 		this._baseUrl = baseUrl;
+		this._onError = onError;
 	}
 
 	/**
 	 * Set session configuration (call after login)
 	 */
 	public setSession( config: SessionConfig ): void {
-		const token: Undefinedable<Uint8Array<ArrayBuffer>> = _base64url_decode( config.token );
+		const token: Undefinedable<Uint8Array<ArrayBuffer>> = _base64url_decode( config.token, this._onError );
 		if( token ) {
 			this._sessionId = config.sessionId;
 			this._token = token;
@@ -274,7 +273,7 @@ class SignedRequester {
 					encoder.encode( dataToSign )
 				);
 
-				const signature: string = _base64url_encode( new Uint8Array( signatureBuffer ) );
+				const signature: string = _base64url_encode( new Uint8Array( signatureBuffer ), this._onError );
 
 				// Build signed request
 				const signedPayload: SignedRequest = {
