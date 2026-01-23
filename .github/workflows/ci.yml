@@ -40,9 +40,9 @@ jobs:
       - name: Run tests with coverage
         run: npx c8 --reporter=text --reporter=lcov npx ava tests/dist/*.test.js --verbose
 
-      - name: Upload coverage to Codecov
+      - name: Upload coverage reports to Codecov
         if: matrix.node-version == 24
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
-          files: ./coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
