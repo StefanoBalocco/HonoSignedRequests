@@ -1,7 +1,8 @@
 {
   "name": "@stefanobalocco/honosignedrequests",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "An hono middleware to manage signed requests, including a client implementation.",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -15,20 +16,28 @@
     }
   },
   "scripts": {
-    "build": "npm run build:server && npm run build:client",
+    "build": "npm run build:server && npm run build:client && npm run build:tests",
     "build:server": "tsc",
-    "build:client": "tsc -p client/tsconfig.json && terser client/dist/SignedRequester.js -o client/dist/SignedRequester.min.js --toplevel -m -c --mangle-props regex=/^_/"
+    "build:client": "tsc -p client/tsconfig.json && terser client/dist/SignedRequester.js -o client/dist/SignedRequester.min.js --toplevel -m -c --mangle-props regex=/^_/",
+    "build:tests": "tsc -p tests/tsconfig.json",
+    "run:tests": "npx ava tests/dist/*.test.js --verbose"
   },
   "devDependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@types/node": "^22.10.5",
+    "ava": "^6.4.1",
+    "c8": "^10.1.3",
     "hono": "^4.10.6",
     "terser": "^5.44.1",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "undici": "^7.4.0"
   },
   "peerDependencies": {
     "hono": "^4.0.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "client/dist"
   ],
   "keywords": [
     "hono",

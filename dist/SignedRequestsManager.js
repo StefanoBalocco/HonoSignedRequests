@@ -1,5 +1,5 @@
-import { constantTimeEqual, fromBase64Url, hmacSha256 } from './Common';
-import { SessionsStorageLocal } from './SessionsStorageLocal';
+import { constantTimeEqual, fromBase64Url, hmacSha256 } from './Common.js';
+import { SessionsStorageLocal } from './SessionsStorageLocal.js';
 export class SignedRequestsManager {
     static _primitives = new Set(['string', 'number', 'boolean']);
     _storage;

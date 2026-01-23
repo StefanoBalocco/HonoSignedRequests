@@ -1,4 +1,4 @@
-import { randomBytes, randomInt } from './Common';
+import { randomBytes, randomInt } from './Common.js';
 export class SessionsStorageLocal {
     _maxSessions;
     _maxSessionsPerUser;

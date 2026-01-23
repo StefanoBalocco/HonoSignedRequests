@@ -1,6 +1,6 @@
-import { Undefinedable } from './Common';
-import { Session } from './Session';
-import { SessionsStorage } from './SessionsStorage';
+import { Undefinedable } from './Common.js';
+import { Session } from './Session.js';
+import { SessionsStorage } from './SessionsStorage.js';
 type SessionStorageLocalConfig = {
     maxSessions: number;
     maxSessionsPerUser: number;

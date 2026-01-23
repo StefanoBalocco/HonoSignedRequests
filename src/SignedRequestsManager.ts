@@ -1,8 +1,8 @@
 import { Context, MiddlewareHandler, Next } from 'hono';
-import { constantTimeEqual, fromBase64Url, hmacSha256, Undefinedable } from './Common';
-import { Session } from './Session';
-import { SessionsStorage } from './SessionsStorage';
-import { SessionsStorageLocal } from './SessionsStorageLocal';
+import { constantTimeEqual, fromBase64Url, hmacSha256, Undefinedable } from './Common.js';
+import { Session } from './Session.js';
+import { SessionsStorage } from './SessionsStorage.js';
+import { SessionsStorageLocal } from './SessionsStorageLocal.js';
 
 type SignedRequestsManagerConfig = {
 	validitySignature: number;

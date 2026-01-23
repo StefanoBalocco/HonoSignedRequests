@@ -39,10 +39,10 @@ function _base64url_encode( value: Uint8Array ): string {
 				.replace( /\//g, '_' )
 				.replace( /=+$/, '' );
 		} catch( error ) {
-			console.error( `base64url_encode: failed to encode (${ error })` );
+			// console.error( `base64url_encode: failed to encode (${ error })` );
 		}
 	} else {
-		console.warn( 'base64url_encode: empty value' );
+		// console.warn( 'base64url_encode: empty value' );
 	}
 	return returnValue;
 }
@@ -62,10 +62,10 @@ function _base64url_decode( value: string ): Undefinedable<Uint8Array<ArrayBuffe
 				char.charCodeAt( 0 )
 			);
 		} catch( error ) {
-			console.error( `base64url_decode: failed to decode (${ error })` );
+			// console.error( `base64url_decode: failed to decode (${ error })` );
 		}
 	} else {
-		console.warn( 'base64url_decode: empty or invalid characters' );
+		// console.warn( 'base64url_decode: empty or invalid characters' );
 	}
 	return returnValue;
 }

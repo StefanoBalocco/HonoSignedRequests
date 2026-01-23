@@ -18,6 +18,9 @@
     "allowSyntheticDefaultImports": true
   },
   "include": [
-    "src/index.ts"
+    "src/Common.test.ts",
+    "src/SessionsStorageLocal.test.ts",
+    "src/SignedRequester.test.ts",
+    "src/SignedRequestsManager.test.ts"
   ]
 }

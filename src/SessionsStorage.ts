@@ -1,5 +1,5 @@
-import { Undefinedable } from './Common';
-import { Session } from './Session';
+import { Undefinedable } from './Common.js';
+import { Session } from './Session.js';
 
 export abstract class SessionsStorage {
 	abstract create(
