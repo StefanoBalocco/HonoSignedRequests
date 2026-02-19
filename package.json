@@ -1,6 +1,6 @@
 {
   "name": "@stefanobalocco/honosignedrequests",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "An hono middleware to manage signed requests, including a client implementation.",
   "author": "Stefano Balocco <stefano.balocco@gmail.com>",
   "license": "BSD-3-Clause",

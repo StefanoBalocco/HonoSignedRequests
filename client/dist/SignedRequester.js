@@ -16,7 +16,7 @@ function _base64url_encode(value, onError) {
 }
 function _base64url_decode(value, onError) {
     let returnValue;
-    if (0 < value?.length && /^[A-Za-z0-9_-]*$/.test(value)) {
+    if (0 < value?.length && _base64UrlVerify.test(value)) {
         const padding = value.length % 4;
         const paddedValue = 0 === padding ? value : value.padEnd(value.length + (4 - padding), '=');
         const base64 = paddedValue.replace(/-/g, '+').replace(/_/g, '/');
@@ -30,6 +30,7 @@ function _base64url_decode(value, onError) {
     }
     return returnValue;
 }
+const _base64UrlVerify = /^(?=.)(?:[A-Za-z0-9\-_]{4})*(?:[A-Za-z0-9\-_]{2}(?:==)?|[A-Za-z0-9\-_]{3}=?)?$/;
 class SignedRequester {
     _semaphoreAcquire(wait = true) {
         let returnValue = Promise.resolve(false);

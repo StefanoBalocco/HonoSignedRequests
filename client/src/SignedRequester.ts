@@ -47,7 +47,7 @@ function _base64url_encode( value: Uint8Array, onError?: ( error: unknown ) => v
 
 function _base64url_decode( value: string, onError?: ( error: unknown ) => void ): Undefinedable<Uint8Array<ArrayBuffer>> {
 	let returnValue: Undefinedable<Uint8Array<ArrayBuffer>>;
-	if( 0 < value?.length && /^[A-Za-z0-9_-]*$/.test( value ) ) {
+	if( 0 < value?.length && _base64UrlVerify.test( value ) ) {
 		const padding = value.length % 4;
 		const paddedValue =
 			0 === padding ? value : value.padEnd( value.length + ( 4 - padding ), '=' );
@@ -65,6 +65,9 @@ function _base64url_decode( value: string, onError?: ( error: unknown ) => void 
 	}
 	return returnValue;
 }
+
+//const _base64Verify = /^(?=.)(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+const _base64UrlVerify = /^(?=.)(?:[A-Za-z0-9\-_]{4})*(?:[A-Za-z0-9\-_]{2}(?:==)?|[A-Za-z0-9\-_]{3}=?)?$/;
 
 // ============================================================================
 // Session Management

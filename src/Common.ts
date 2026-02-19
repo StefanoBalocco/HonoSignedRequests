@@ -1,7 +1,7 @@
 export type Undefinedable<T> = T | undefined;
 
 export function fromBase64Url( b64url: string ): Uint8Array<ArrayBuffer> {
-	const pad: number = ( 4 - ( b64url.length % 4 ) ) % 4;
+	const pad: number = ( 4 - ( b64url?.length % 4 ) ) % 4;
 	const b64: string = ( b64url + "=".repeat( pad ) ).replace( /-/g, "+" ).replace( /_/g, "/" );
 	const binary: string = atob( b64 );
 	const cFL: number = binary.length;
@@ -54,3 +54,6 @@ export async function hmacSha256( keyBytes: Uint8Array<ArrayBuffer>, data: strin
 	const signature: ArrayBuffer = await crypto.subtle.sign( "HMAC", key, textEncoder.encode( data ) );
 	return new Uint8Array( signature );
 }
+
+export const base64Verify = /^(?=.)(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+export const base64UrlVerify = /^(?=.)(?:[A-Za-z0-9\-_]{4})*(?:[A-Za-z0-9\-_]{2}(?:==)?|[A-Za-z0-9\-_]{3}=?)?$/;

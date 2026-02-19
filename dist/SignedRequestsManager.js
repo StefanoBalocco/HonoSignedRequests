@@ -1,4 +1,4 @@
-import { constantTimeEqual, fromBase64Url, hmacSha256 } from './Common.js';
+import { base64UrlVerify, constantTimeEqual, fromBase64Url, hmacSha256 } from './Common.js';
 import { SessionsStorageLocal } from './SessionsStorageLocal.js';
 export class SignedRequestsManager {
     static _primitives = new Set(['string', 'number', 'boolean']);
@@ -61,12 +61,13 @@ export class SignedRequestsManager {
                     break;
                 }
                 case 'POST': {
-                    switch (context.req.header('Content-Type')) {
+                    switch (context.req.header('Content-Type')?.split(';')[0].trim().toLowerCase()) {
                         case 'application/json': {
                             Object.assign(parameters, await context.req.json());
                             break;
                         }
-                        default: {
+                        case 'multipart/form-data':
+                        case 'application/x-www-form-urlencoded': {
                             Object.assign(parameters, await context.req.parseBody());
                             break;
                         }
@@ -75,11 +76,18 @@ export class SignedRequestsManager {
             }
             const sessionId = parseInt(parameters.sessionId, 10);
             const timestamp = parseInt(parameters.timestamp, 10);
-            const signature = fromBase64Url(parameters.signature);
-            if (sessionId && timestamp && signature) {
-                const { sessionId: _, timestamp: __, signature: ___, ...other } = parameters;
-                const otherParameters = Object.entries(other);
-                session = await this.validate(sessionId, timestamp, otherParameters, signature);
+            if (sessionId && timestamp) {
+                if (parameters.signature) {
+                    if (base64UrlVerify.test(parameters.signature)) {
+                        const signature = fromBase64Url(parameters.signature);
+                        const { sessionId: _, timestamp: __, signature: ___, ...other } = parameters;
+                        const otherParameters = Object.entries(other);
+                        session = await this.validate(sessionId, timestamp, otherParameters, signature);
+                    }
+                    else {
+                        throw new Error('Invalid signature format');
+                    }
+                }
             }
         }
         catch (error) {

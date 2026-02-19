@@ -1,5 +1,5 @@
 export function fromBase64Url(b64url) {
-    const pad = (4 - (b64url.length % 4)) % 4;
+    const pad = (4 - (b64url?.length % 4)) % 4;
     const b64 = (b64url + "=".repeat(pad)).replace(/-/g, "+").replace(/_/g, "/");
     const binary = atob(b64);
     const cFL = binary.length;
@@ -43,3 +43,5 @@ export async function hmacSha256(keyBytes, data) {
     const signature = await crypto.subtle.sign("HMAC", key, textEncoder.encode(data));
     return new Uint8Array(signature);
 }
+export const base64Verify = /^(?=.)(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+export const base64UrlVerify = /^(?=.)(?:[A-Za-z0-9\-_]{4})*(?:[A-Za-z0-9\-_]{2}(?:==)?|[A-Za-z0-9\-_]{3}=?)?$/;

@@ -1,5 +1,5 @@
 import { Context, MiddlewareHandler, Next } from 'hono';
-import { constantTimeEqual, fromBase64Url, hmacSha256, Undefinedable } from './Common.js';
+import { base64UrlVerify, constantTimeEqual, fromBase64Url, hmacSha256, Undefinedable } from './Common.js';
 import { Session } from './Session.js';
 import { SessionsStorage } from './SessionsStorage.js';
 import { SessionsStorageLocal } from './SessionsStorageLocal.js';
@@ -87,12 +87,13 @@ export class SignedRequestsManager {
 					break;
 				}
 				case 'POST': {
-					switch( context.req.header( 'Content-Type' ) ) {
+					switch( context.req.header( 'Content-Type' )?.split( ';' )[ 0 ].trim().toLowerCase() ) {
 						case 'application/json': {
 							Object.assign( parameters, await context.req.json() );
 							break;
 						}
-						default: {
+						case 'multipart/form-data':
+						case  'application/x-www-form-urlencoded': {
 							Object.assign( parameters, await context.req.parseBody() );
 							break;
 						}
@@ -102,21 +103,27 @@ export class SignedRequestsManager {
 
 			const sessionId: number = parseInt( parameters.sessionId, 10 );
 			const timestamp: number = parseInt( parameters.timestamp, 10 );
-			const signature: Uint8Array<ArrayBuffer> = fromBase64Url( parameters.signature );
 
-			if( sessionId && timestamp && signature ) {
-				// Remove sessionId, timestamp, and signature from parameters before validation
-				const { sessionId: _, timestamp: __, signature: ___, ...other } = parameters;
+			if( sessionId && timestamp ) {
+				if( parameters.signature ) {
+					if( base64UrlVerify.test( parameters.signature ) ) {
+						const signature: Uint8Array<ArrayBuffer> = fromBase64Url( parameters.signature );
+						// Remove sessionId, timestamp, and signature from parameters before validation
+						const { sessionId: _, timestamp: __, signature: ___, ...other } = parameters;
 
-				// Convert to array of tuples for sessionValidate
-				const otherParameters: [ string, string ][] = Object.entries( other );
+						// Convert to array of tuples for sessionValidate
+						const otherParameters: [ string, string ][] = Object.entries( other );
 
-				session = await this.validate(
-					sessionId,
-					timestamp,
-					otherParameters,
-					signature
-				);
+						session = await this.validate(
+							sessionId,
+							timestamp,
+							otherParameters,
+							signature
+						);
+					} else {
+						throw new Error( 'Invalid signature format' );
+					}
+				}
 			}
 		} catch( error ) {
 			this._onError?.( error );

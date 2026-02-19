@@ -4,3 +4,5 @@ export declare function randomBytes(bytes: number): Uint8Array<ArrayBuffer>;
 export declare function randomInt(min: number, max: number): number;
 export declare function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean;
 export declare function hmacSha256(keyBytes: Uint8Array<ArrayBuffer>, data: string): Promise<Uint8Array<ArrayBuffer>>;
+export declare const base64Verify: RegExp;
+export declare const base64UrlVerify: RegExp;
