@@ -1,5 +1,5 @@
 import test from 'ava';
-import { SignedRequester } from '../../client/dist/SignedRequester.js';
+import SignedRequester from '../../client/dist/SignedRequester.js';
 import { LocalStorageMock, base64urlEncode } from './TestHelpers.js';
 
 // Setup global localStorage mock

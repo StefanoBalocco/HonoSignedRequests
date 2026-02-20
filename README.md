@@ -145,7 +145,9 @@ These are specific to the in-memory implementation:
 
 ```html
 <script type="module">
-  import { SignedRequester } from 'https://cdn.jsdelivr.net/gh/StefanoBalocco/HonoSignedRequests/client/dist/SignedRequester.min.js';
+  import SignedRequester from 'https://cdn.jsdelivr.net/gh/StefanoBalocco/HonoSignedRequests@1.2.0/client/dist/SignedRequester.min.js';
+  // Named import also works:
+  // import { SignedRequester } from 'https://cdn.jsdelivr.net/gh/StefanoBalocco/HonoSignedRequests@1.2.0/client/dist/SignedRequester.min.js';
   
   const requester = new SignedRequester();
   // You can also specify a base URL for requests

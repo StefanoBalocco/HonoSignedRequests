@@ -217,3 +217,4 @@ SignedRequester._primitives = new Set([
     'number'
 ]);
 export { SignedRequester };
+export default SignedRequester;

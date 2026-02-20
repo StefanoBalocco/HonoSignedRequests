@@ -1,5 +1,7 @@
 .idea
 .claude
+.omc
+AGENTS.md
 CLAUDE.md
 node_modules
 pnpm-lock.yaml

@@ -36,3 +36,4 @@ declare class SignedRequester {
 }
 export type { SessionConfig, SignedRequest, SignedRequestOptions };
 export { SignedRequester };
+export default SignedRequester;

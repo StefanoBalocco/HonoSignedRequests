@@ -365,3 +365,4 @@ export type { SessionConfig, SignedRequest, SignedRequestOptions };
 
 // Export class for custom instances
 export { SignedRequester };
+export default SignedRequester;
