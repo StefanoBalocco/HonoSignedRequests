@@ -1,4 +1,4 @@
-type Methods = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type Methods = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 type SessionConfig = {
     sessionId: number;
     token: string;

@@ -156,17 +156,21 @@ class SignedRequester {
                     signature: signature
                 };
                 Object.assign(signedPayload, Object.fromEntries(parametersArray));
-                const url = options.baseUrl
-                    ? `${options.baseUrl}${path}`
-                    : (this._baseUrl ? `${this._baseUrl}${path}` : path);
+                let url = (options.baseUrl || this._baseUrl || '') + path;
                 const method = options.method || 'POST';
+                const hasBody = !['GET', 'HEAD'].includes(method);
+                const headers = { ...options.headers };
+                if (hasBody) {
+                    headers['Content-Type'] = 'application/json';
+                }
+                else {
+                    const queryString = new URLSearchParams(Object.entries(signedPayload).map(([k, v]) => [k, String(v)])).toString();
+                    url += (url.includes('?') ? '&' : '?') + queryString;
+                }
                 returnValue = await fetch(url, {
                     method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...options.headers
-                    },
-                    body: JSON.stringify(signedPayload)
+                    headers: headers,
+                    body: (hasBody ? JSON.stringify(signedPayload) : undefined)
                 });
                 if (returnValue.ok) {
                     this._incrementSequenceNumber();

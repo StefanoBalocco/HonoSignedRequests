@@ -75,6 +75,55 @@ test('SignedRequestsManager: Uses default storage if none provided', async (t) =
     t.truthy(session);
     t.is(session.userId, 1);
 });
+test('Middleware: Validates GET request', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.get('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session, userId: session?.userId });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const queryParams = new URLSearchParams({
+        sessionId: String(session.id),
+        timestamp: String(timestamp),
+        signature: signatureBase64,
+        action: 'test'
+    });
+    const res = await app.request(`/api/test?${queryParams.toString()}`, {
+        method: 'GET'
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.true(json.authenticated);
+    t.is(json.userId, 1);
+});
+test('Middleware: Validates HEAD request', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.get('/api/test', (c) => {
+        const session = c.get('session');
+        c.header('x-authenticated', session ? 'true' : 'false');
+        return c.body(null, 200);
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const queryParams = new URLSearchParams({
+        sessionId: String(session.id),
+        timestamp: String(timestamp),
+        signature: signatureBase64,
+        action: 'test'
+    });
+    const res = await app.request(`/api/test?${queryParams.toString()}`, {
+        method: 'HEAD'
+    });
+    t.is(res.status, 200);
+    t.is(res.headers.get('x-authenticated'), 'true');
+});
 test('Middleware: Validates POST request with JSON', async (t) => {
     const { manager } = createStorageAndManager();
     const app = createMiddlewareApp(manager);
@@ -95,31 +144,6 @@ test('Middleware: Validates POST request with JSON', async (t) => {
             signature: signatureBase64,
             action: 'test'
         })
-    });
-    const json = await res.json();
-    t.is(res.status, 200);
-    t.true(json.authenticated);
-    t.is(json.userId, 1);
-});
-test('Middleware: Validates GET request', async (t) => {
-    const { manager } = createStorageAndManager();
-    const app = createMiddlewareApp(manager);
-    app.get('/api/test', (c) => {
-        const session = c.get('session');
-        return c.json({ authenticated: !!session, userId: session?.userId });
-    });
-    const session = await manager.createSession(1);
-    const timestamp = Date.now();
-    const parameters = [['action', 'test']];
-    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
-    const queryParams = new URLSearchParams({
-        sessionId: String(session.id),
-        timestamp: String(timestamp),
-        signature: signatureBase64,
-        action: 'test'
-    });
-    const res = await app.request(`/api/test?${queryParams.toString()}`, {
-        method: 'GET'
     });
     const json = await res.json();
     t.is(res.status, 200);
@@ -152,6 +176,215 @@ test('Middleware: Validates POST request with form data', async (t) => {
     t.is(res.status, 200);
     t.true(json.authenticated);
     t.is(json.userId, 1);
+});
+test('Middleware: Validates PUT request with JSON', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.put('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session, userId: session?.userId });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const res = await app.request('/api/test', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: session.id,
+            timestamp,
+            signature: signatureBase64,
+            action: 'test'
+        })
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.true(json.authenticated);
+    t.is(json.userId, 1);
+});
+test('Middleware: Validates PUT request with form data', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.put('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session, userId: session?.userId });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const formData = new URLSearchParams({
+        sessionId: String(session.id),
+        timestamp: String(timestamp),
+        signature: signatureBase64,
+        action: 'test'
+    });
+    const res = await app.request('/api/test', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.true(json.authenticated);
+    t.is(json.userId, 1);
+});
+test('Middleware: Validates DELETE request with JSON', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.delete('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session, userId: session?.userId });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const res = await app.request('/api/test', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: session.id,
+            timestamp,
+            signature: signatureBase64,
+            action: 'test'
+        })
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.true(json.authenticated);
+    t.is(json.userId, 1);
+});
+test('Middleware: Validates PATCH request with JSON', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.patch('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session, userId: session?.userId });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const res = await app.request('/api/test', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: session.id,
+            timestamp,
+            signature: signatureBase64,
+            action: 'test'
+        })
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.true(json.authenticated);
+    t.is(json.userId, 1);
+});
+test('Middleware: POST with params only in query string is not authenticated', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.post('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const queryParams = new URLSearchParams({
+        sessionId: String(session.id),
+        timestamp: String(timestamp),
+        signature: signatureBase64,
+        action: 'test'
+    });
+    const res = await app.request(`/api/test?${queryParams.toString()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.false(json.authenticated);
+});
+test('Middleware: PUT with params only in query string is not authenticated', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.put('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const queryParams = new URLSearchParams({
+        sessionId: String(session.id),
+        timestamp: String(timestamp),
+        signature: signatureBase64,
+        action: 'test'
+    });
+    const res = await app.request(`/api/test?${queryParams.toString()}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.false(json.authenticated);
+});
+test('Middleware: DELETE with params only in query string is not authenticated', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.delete('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const queryParams = new URLSearchParams({
+        sessionId: String(session.id),
+        timestamp: String(timestamp),
+        signature: signatureBase64,
+        action: 'test'
+    });
+    const res = await app.request(`/api/test?${queryParams.toString()}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.false(json.authenticated);
+});
+test('Middleware: PATCH with params only in query string is not authenticated', async (t) => {
+    const { manager } = createStorageAndManager();
+    const app = createMiddlewareApp(manager);
+    app.patch('/api/test', (c) => {
+        const session = c.get('session');
+        return c.json({ authenticated: !!session });
+    });
+    const session = await manager.createSession(1);
+    const timestamp = Date.now();
+    const parameters = [['action', 'test']];
+    const { signatureBase64 } = await createSignature(session, timestamp, parameters);
+    const queryParams = new URLSearchParams({
+        sessionId: String(session.id),
+        timestamp: String(timestamp),
+        signature: signatureBase64,
+        action: 'test'
+    });
+    const res = await app.request(`/api/test?${queryParams.toString()}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+    });
+    const json = await res.json();
+    t.is(res.status, 200);
+    t.false(json.authenticated);
 });
 test('Middleware: Rejects invalid signature', async (t) => {
     const { manager } = createStorageAndManager();

@@ -5,7 +5,7 @@
 
 type Undefinedable<T> = T | undefined;
 type Nullable<T> = T | null;
-type Methods = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type Methods = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
 type SessionConfig = {
 	sessionId: number;
@@ -287,18 +287,24 @@ class SignedRequester {
 				Object.assign( signedPayload, Object.fromEntries( parametersArray ) );
 
 				// Build URL: options.baseUrl has priority, then instance baseUrl, then relative path
-				const url: string = options.baseUrl
-					? `${ options.baseUrl }${ path }`
-					: ( this._baseUrl ? `${ this._baseUrl }${ path }` : path );
+				let url: string = ( options.baseUrl || this._baseUrl || '' ) + path;
 				const method: Methods = options.method || 'POST';
-
+				const hasBody: boolean = ![ 'GET', 'HEAD' ].includes( method );
+				const headers = { ...options.headers };
+				if( hasBody ) {
+					headers[ 'Content-Type' ] = 'application/json';
+				} else {
+					const queryString: string = new URLSearchParams(
+						Object.entries( signedPayload ).map(
+							( [ k, v ]: [ string, string ] ): string[] => [ k, String( v ) ]
+						)
+					).toString();
+					url += ( url.includes( '?' ) ? '&' : '?' ) + queryString;
+				}
 				returnValue = await fetch( url, {
 					method: method,
-					headers: {
-						'Content-Type': 'application/json',
-						...options.headers
-					},
-					body: JSON.stringify( signedPayload )
+					headers: headers,
+					body: ( hasBody ? JSON.stringify( signedPayload ) : undefined )
 				} );
 
 				// Increment sequence number on successful request

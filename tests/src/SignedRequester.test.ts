@@ -6,9 +6,22 @@ import { LocalStorageMock, base64urlEncode } from './TestHelpers.js';
 const localStorageMock = new LocalStorageMock();
 ( global as any ).localStorage = localStorageMock;
 
-// Setup: clear localStorage before each test
+// Shared fetch mock for request format tests
+type CapturedRequest = { url: string; init: RequestInit };
+let capturedRequest: CapturedRequest | undefined;
+
+( global as any ).fetch = async ( input: RequestInfo | URL, init: RequestInit = {} ): Promise<Response> => {
+	capturedRequest = { url: input.toString(), init };
+	return new Response( JSON.stringify( { ok: true } ), {
+		status: 200,
+		headers: { 'Content-Type': 'application/json' }
+	} );
+};
+
+// Setup: clear localStorage and captured request before each test
 test.beforeEach( () => {
 	localStorageMock.clear();
+	capturedRequest = undefined;
 } );
 
 test( 'SignedRequester: Can be instantiated', ( t ) => {
@@ -180,4 +193,107 @@ test( 'SignedRequester: Calls onError callback on decode error in getSession', (
 	// The token decodes successfully, so no error
 	t.true( hasSession );
 	t.is( errors.length, 0 );
+} );
+
+// ============================================================================
+// Unit Tests: Request Format
+// ============================================================================
+
+function createSessionedRequester( baseUrl?: string ): SignedRequester {
+	const requester = new SignedRequester( baseUrl );
+	const token = base64urlEncode( new Uint8Array( 32 ).fill( 1 ) );
+	requester.setSession( { sessionId: 1, token, sequenceNumber: 1 } );
+	return requester;
+}
+
+test( 'SignedRequester: GET sends params as query string without body', async ( t ) => {
+	const requester = createSessionedRequester( 'https://api.example.com' );
+	await requester.signedRequest( '/api/test', { action: 'read' }, { method: 'GET' } );
+
+	const req = capturedRequest!;
+	const url = new URL( req.url );
+
+	t.is( req.init.body, undefined );
+	t.truthy( url.searchParams.get( 'sessionId' ) );
+	t.truthy( url.searchParams.get( 'timestamp' ) );
+	t.truthy( url.searchParams.get( 'signature' ) );
+	t.is( url.searchParams.get( 'action' ), 'read' );
+} );
+
+test( 'SignedRequester: HEAD sends params as query string without body', async ( t ) => {
+	const requester = createSessionedRequester( 'https://api.example.com' );
+	await requester.signedRequest( '/api/test', { action: 'read' }, { method: 'HEAD' } );
+
+	const req = capturedRequest!;
+	const url = new URL( req.url );
+
+	t.is( req.init.body, undefined );
+	t.truthy( url.searchParams.get( 'sessionId' ) );
+	t.truthy( url.searchParams.get( 'timestamp' ) );
+	t.truthy( url.searchParams.get( 'signature' ) );
+	t.is( url.searchParams.get( 'action' ), 'read' );
+} );
+
+test( 'SignedRequester: POST sends params as JSON body without query string', async ( t ) => {
+	const requester = createSessionedRequester( 'https://api.example.com' );
+	await requester.signedRequest( '/api/test', { action: 'write' }, { method: 'POST' } );
+
+	const req = capturedRequest!;
+	const url = new URL( req.url );
+	const body = JSON.parse( req.init.body as string );
+
+	t.is( url.searchParams.get( 'sessionId' ), null );
+	t.is( url.searchParams.get( 'signature' ), null );
+	t.truthy( body.sessionId );
+	t.truthy( body.timestamp );
+	t.truthy( body.signature );
+	t.is( body.action, 'write' );
+} );
+
+test( 'SignedRequester: PUT sends params as JSON body without query string', async ( t ) => {
+	const requester = createSessionedRequester( 'https://api.example.com' );
+	await requester.signedRequest( '/api/test', { action: 'write' }, { method: 'PUT' } );
+
+	const req = capturedRequest!;
+	const url = new URL( req.url );
+	const body = JSON.parse( req.init.body as string );
+
+	t.is( url.searchParams.get( 'sessionId' ), null );
+	t.is( url.searchParams.get( 'signature' ), null );
+	t.truthy( body.sessionId );
+	t.truthy( body.timestamp );
+	t.truthy( body.signature );
+	t.is( body.action, 'write' );
+} );
+
+test( 'SignedRequester: DELETE sends params as JSON body without query string', async ( t ) => {
+	const requester = createSessionedRequester( 'https://api.example.com' );
+	await requester.signedRequest( '/api/test', { action: 'write' }, { method: 'DELETE' } );
+
+	const req = capturedRequest!;
+	const url = new URL( req.url );
+	const body = JSON.parse( req.init.body as string );
+
+	t.is( url.searchParams.get( 'sessionId' ), null );
+	t.is( url.searchParams.get( 'signature' ), null );
+	t.truthy( body.sessionId );
+	t.truthy( body.timestamp );
+	t.truthy( body.signature );
+	t.is( body.action, 'write' );
+} );
+
+test( 'SignedRequester: PATCH sends params as JSON body without query string', async ( t ) => {
+	const requester = createSessionedRequester( 'https://api.example.com' );
+	await requester.signedRequest( '/api/test', { action: 'write' }, { method: 'PATCH' } );
+
+	const req = capturedRequest!;
+	const url = new URL( req.url );
+	const body = JSON.parse( req.init.body as string );
+
+	t.is( url.searchParams.get( 'sessionId' ), null );
+	t.is( url.searchParams.get( 'signature' ), null );
+	t.truthy( body.sessionId );
+	t.truthy( body.timestamp );
+	t.truthy( body.signature );
+	t.is( body.action, 'write' );
 } );

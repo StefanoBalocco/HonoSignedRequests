@@ -56,11 +56,15 @@ export class SignedRequestsManager {
         try {
             const parameters = {};
             switch (context.req.method) {
-                case 'GET': {
+                case 'GET':
+                case 'HEAD': {
                     Object.assign(parameters, context.req.query());
                     break;
                 }
-                case 'POST': {
+                case 'POST':
+                case 'PUT':
+                case 'DELETE':
+                case 'PATCH': {
                     switch (context.req.header('Content-Type')?.split(';')[0].trim().toLowerCase()) {
                         case 'application/json': {
                             Object.assign(parameters, await context.req.json());
